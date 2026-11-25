@@ -11,18 +11,22 @@ const ease = { out: k => 1 - Math.pow(1 - k, 3), inOut: k => k < .5 ? 4 * k * k 
 export class Table {
   constructor(canvas, cam, opts = {}) {
     this.cam = cam; this.speed = 1; this.tokenArt = opts.tokenArt || {};
+    // the view: the canvas's size on the stage and where it sits (desktop 1920x1080 at 0,0; the phone layout draws the upright
+    // render at the phone's width and moves it up on short phones). project() and pointer picks work in stage pixels.
+    this.V = Object.assign({ w: 1920, h: 1080, ox: 0, oy: 0, dpr: Math.min(2, window.devicePixelRatio || 1) }, opts.view || {});
     const b = cam.board; Object.assign(this, { CW: b.CW, CH: b.CH, G: b.G, MID: b.MID });
     this.GPAD = 0.16;   // how far the card glow reaches past the card
+    this.DEF_S = 0.8;   // a Defense Position card's size on the table
     this.COLX = i => (i - 3) * (this.CW + this.G);
     this.ROW_M = -(this.MID / 2 + this.CH / 2); this.ROW_S = this.ROW_M - (this.CH + this.G);
 
     const r = this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'high-performance' });
-    r.setSize(1920, 1080, false); r.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+    r.setPixelRatio(this.V.dpr); r.setSize(this.V.w, this.V.h, false);
     r.outputColorSpace = THREE.SRGBColorSpace; r.shadowMap.enabled = true; r.shadowMap.type = THREE.PCFSoftShadowMap;
     this.scene = new THREE.Scene();
     // the Blender camera: lens over a 36 mm sensor, fitted to the width
-    const hfov = 2 * Math.atan(cam.sensor / 2 / cam.lens), vfov = 2 * Math.atan(Math.tan(hfov / 2) * 1080 / 1920);
-    this.camera = new THREE.PerspectiveCamera(THREE.MathUtils.radToDeg(vfov), 1920 / 1080, 0.05, 100);
+    const hfov = 2 * Math.atan(cam.sensor / 2 / cam.lens), vfov = 2 * Math.atan(Math.tan(hfov / 2) * this.V.h / this.V.w);
+    this.camera = new THREE.PerspectiveCamera(THREE.MathUtils.radToDeg(vfov), this.V.w / this.V.h, 0.05, 100);
     const [lx, ly, lz] = cam.loc, [tx, ty, tz] = cam.target;
     this.camera.position.copy(B(lx, ly, lz)); this.camera.up.set(0, 1, 0); this.camera.lookAt(B(tx, ty, tz)); this.camera.updateMatrixWorld();
 
@@ -51,7 +55,7 @@ export class Table {
     this.onHover = () => {}; this.onClick = () => {}; this.onFrame = () => {};
     this.buildZones();
     this.loop = this.loop.bind(this); requestAnimationFrame(this.loop);
-    this.lastFrame = performance.now(); setInterval(() => { const now = performance.now(); if (now - this.lastFrame > 250) this.step(now); }, 100);
+    this.lastFrame = performance.now(); this.tick = setInterval(() => { const now = performance.now(); if (now - this.lastFrame > 250) this.step(now); }, 100);
     document.addEventListener('visibilitychange', () => { if (document.hidden) for (const tw of this.tweens.splice(0)) { tw.fn(1); tw.res(); } });
   }
 
@@ -79,10 +83,12 @@ export class Table {
   }
   pileTop(side, kind) { const p = this.piles.get(side + ':' + kind); const v = this.slot(side, kind); v.y = (p ? p.h : 0) + 0.008; return v; }
   screenToWorld(x, y, height = 1.2) {
-    this.ptr.set(x / 1920 * 2 - 1, -(y / 1080) * 2 + 1); this.ray.setFromCamera(this.ptr, this.camera);
+    this.ndc(x, y); this.ray.setFromCamera(this.ptr, this.camera);
     const t = (height - this.ray.ray.origin.y) / this.ray.ray.direction.y; return this.ray.ray.origin.clone().add(this.ray.ray.direction.clone().multiplyScalar(t));
   }
-  project(v) { const p = v.clone().project(this.camera); return { x: (p.x + 1) / 2 * 1920, y: (1 - p.y) / 2 * 1080 }; }
+  ndc(x, y) { const V = this.V; this.ptr.set((x - V.ox) / V.w * 2 - 1, -((y - V.oy) / V.h) * 2 + 1); }
+  project(v) { const p = v.clone().project(this.camera), V = this.V; return { x: V.ox + (p.x + 1) / 2 * V.w, y: V.oy + (1 - p.y) / 2 * V.h }; }
+  setView(o) { const resize = (o.w && o.w !== this.V.w) || (o.h && o.h !== this.V.h); Object.assign(this.V, o); if (resize) this.renderer.setSize(this.V.w, this.V.h, false); }   // the same shape, so the camera stays
   cardScreen(u, edge = 0) { const c = this.cards.get(u); if (!c) return null; const v = c.g.position.clone(); if (edge) v.add(new THREE.Vector3(0, 0, edge * (c.def ? this.CW : this.CH) / 2)); return this.project(v); }
 
   /* ---------- tweens ---------- */
@@ -94,15 +100,16 @@ export class Table {
   wait(ms) { return this.tween(ms, () => {}); }
   // moves a card group to a pose along a lifted arc
   async glide(c, pos, rotY, up, dur = 420, lift = 0.5, o = {}) {
-    const p0 = c.g.position.clone(), r0 = c.g.rotation.y, z0 = c.m.rotation.z, z1 = up ? 0 : Math.PI;
+    const p0 = c.g.position.clone(), r0 = c.g.rotation.y, z0 = c.m.rotation.z, z1 = up ? 0 : Math.PI, s0 = c.g.scale.x, s1 = c.base || 1;
     let dr = rotY - r0; while (dr > Math.PI) dr -= 2 * Math.PI; while (dr < -Math.PI) dr += 2 * Math.PI;
     const peak = o.peak || 0.42;  // where the arc is highest (0..1)
     await this.tween(dur, k => {
-      const m = ease.sine(k);
+      const m = o.smooth ? ease.inOut(k) : ease.sine(k);
       c.g.position.lerpVectors(p0, pos, m);
       const h = k < peak ? Math.sin(Math.PI / 2 * k / peak) : Math.cos(Math.PI / 2 * (k - peak) / (1 - peak));
       c.g.position.y += h * lift;
-      c.g.rotation.y = r0 + dr * ease.inOut(Math.min(1, k * 1.15));
+      c.g.rotation.y = r0 + dr * ease.inOut(Math.min(1, k * (o.smooth ? 1 : 1.15)));
+      { const sc = s0 + (s1 - s0) * ease.inOut(k); c.g.scale.set(sc, 1, sc); }
       c.m.rotation.z = z0 + (z1 - z0) * ease.inOut(Math.min(1, Math.max(0, (k - 0.1) / 0.7)));
       if (o.tilt) c.g.rotation.x = Math.sin(Math.PI * k) * o.tilt;
     }, ease.lin);
@@ -111,8 +118,8 @@ export class Table {
   }
   // a small landing: the card touches down and eases flat (no jump in size)
   settle(c, amt = 0.06) {
-    const y = c.g.position.y;
-    return this.tween(170, k => { const s = 1 + amt * (1 - ease.out(k)); c.g.scale.set(s, 1, s); c.g.position.y = y + 0.03 * (1 - ease.out(k)); }, ease.lin).then(() => { c.g.scale.set(1, 1, 1); c.g.position.y = y; });
+    const y = c.g.position.y, b = c.base || 1;
+    return this.tween(170, k => { const s = b * (1 + amt * (1 - ease.out(k))); c.g.scale.set(s, 1, s); c.g.position.y = y + 0.03 * (1 - ease.out(k)); }, ease.lin).then(() => { c.g.scale.set(b, 1, b); c.g.position.y = y; });
   }
   pose(side, def) { return (side === 1 ? 0 : Math.PI) + (def ? Math.PI / 2 : 0); }
 
@@ -129,9 +136,9 @@ export class Table {
       if (o.fromUp == null) c.m.rotation.z = o.up ? 0 : Math.PI;
     }
     if (o.id != null) this.setFace(c, o.id);
-    Object.assign(c, { def, side, zone, i, up: !!o.up });
+    Object.assign(c, { def, side, zone, i, up: !!o.up, base: def ? this.DEF_S : 1 });
     const set = !o.up;
-    await this.glide(c, pos, rotY, !!o.up, o.dur || (set ? 380 : 480), o.lift != null ? o.lift : (set ? 0.22 : 0.7), { peak: set ? 0.35 : 0.5, tilt: set ? 0 : -0.25, settle: set ? 0.03 : 0.08 });
+    await this.glide(c, pos, rotY, !!o.up, o.dur || (set ? 380 : 480), o.lift != null ? o.lift : (set ? 0.3 : 0.6), { peak: set ? 0.4 : 0.45, tilt: set ? 0 : -0.18, settle: set ? 0.03 : 0.06, smooth: true });
   }
   // take a card off the field to a point, then remove it
   async remove(u, to, o = {}) {
@@ -265,8 +272,15 @@ export class Table {
   /* ---------- pointer ---------- */
   bindPointer(el, toStage) {
     const pick = e => {
-      const p = toStage(e); this.ptr.set(p.x / 1920 * 2 - 1, -(p.y / 1080) * 2 + 1); this.ray.setFromCamera(this.ptr, this.camera);
+      const p = toStage(e); this.ndc(p.x, p.y); this.ray.setFromCamera(this.ptr, this.camera);
       const objs = [...[...this.cards.values()].map(c => c.m), ...[...this.piles.values()].map(p => p.m), ...this.zones.filter(z => z.visible)];
+      // while you pick a target, a tap goes to the pickable card whose middle is nearest the finger (within about a card's width),
+      // so a tap near the edge of a card never lands on its neighbour (Zack, 2026-11-24)
+      if (this.prefer && this.prefer.size) {
+        let best = null, bd = Infinity; const lim = 0.7 * Math.abs(this.project(new THREE.Vector3(this.CW, 0, 0)).x - this.project(new THREE.Vector3(0, 0, 0)).x);
+        for (const u of this.prefer) { const c = this.cards.get(u); if (!c) continue; const q = this.project(c.g.position); const d = Math.hypot(q.x - p.x, q.y - p.y); if (d < bd) { bd = d; best = u; } }
+        if (best != null && bd <= lim) return { u: best };
+      }
       const hit = this.ray.intersectObjects(objs, false)[0]; if (!hit) return null;
       const o = hit.object; if (o.userData.zone) return { zone: o.userData.zone };
       if (o.userData.pile) return { pile: o.userData.pile };
@@ -274,18 +288,22 @@ export class Table {
       return null;
     };
     el.addEventListener('pointermove', e => this.onHover(pick(e), e));
+    // a touch has no hover: the finger going down shows the card the same way a mouse over it would (Zack, 2026-11-24: touch)
+    el.addEventListener('pointerdown', e => { if (e.pointerType !== 'mouse') this.onHover(pick(e), e); });
     el.addEventListener('click', e => this.onClick(pick(e), e));
   }
 
   // tweens advance here; a fallback clock calls it too when the browser stops sending frames (a background tab or window)
   step(now) { for (const tw of [...this.tweens]) { const k = Math.min(1, (now - tw.t0) / tw.dur); tw.fn(tw.e(k)); if (k >= 1) { this.tweens.splice(this.tweens.indexOf(tw), 1); tw.res(); } } }
+  dispose() { this.dead = true; clearInterval(this.tick); this.renderer.dispose(); }
   loop(t) {
+    if (this.dead) return;
     requestAnimationFrame(this.loop);
     const now = performance.now(); this.lastFrame = now;
     this.step(now);
     const pulse = 0.5 + 0.5 * Math.sin(now / 220);
     const T = now / 1000; for (const z of this.zones) if (z.visible) z.material.uniforms.uTime.value = T + z.userData.zone.i * 0.7;
-    for (const [u, m] of this.glows) { const c = this.cards.get(u); if (!c) continue; m.position.set(c.g.position.x, 0.005, c.g.position.z); m.rotation.z = c.def ? Math.PI / 2 : 0; m.material.uniforms.uTime.value = T + (u % 7) * 0.9; m.material.uniforms.uAmp.value = Math.min(1, (now - m.userData.t0) / 220); }
+    for (const [u, m] of this.glows) { const c = this.cards.get(u); if (!c) continue; m.position.set(c.g.position.x, 0.005, c.g.position.z); m.rotation.z = c.def ? Math.PI / 2 : 0; m.scale.setScalar(c.g.scale.x); m.material.uniforms.uTime.value = T + (u % 7) * 0.9; m.material.uniforms.uAmp.value = Math.min(1, (now - m.userData.t0) / 220); }
     for (const m of this.rings) { const c = this.cards.get(m.userData.follow); if (c) m.position.set(c.g.position.x, c.g.position.y + 0.03, c.g.position.z); m.rotation.z = now / 900; }
     this.onFrame();
     this.renderer.render(this.scene, this.camera);

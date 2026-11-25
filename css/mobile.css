@@ -1,0 +1,635 @@
+/* Learn Retro Play: the phone layout (Zack, 2026-11-24: "a specific mobile version/layout and that doesnt need to be in landscape...
+   could not affect the web experience"; mock-ups in mockups/mobile/). Every rule is scoped to #stage.m (or html.m), which only phones get
+   (game.js MOBILE), so computers and tablets never see any of it. The stage is 390 points wide and as tall as the screen. */
+html.m,html.m body{background:#0b0c10;overflow:hidden;height:100%}
+#stage.m{--sat:max(env(safe-area-inset-top,0px),10px);--sab:max(env(safe-area-inset-bottom,0px),10px);--row:calc(var(--sab) + 252px);font-size:16px}
+#stage.m .key,#stage.m .keybar .kh,#stage.m .ticker,#stage.m .crumbs,#stage.m .rays,#stage.m .slab,#stage.m .slab2,#stage.m .bug,#stage.m .water,#stage.m .lamp,#stage.m .dust,#stage.m #gFull,#stage.m .bkeys{display:none!important}
+#stage.m .gb:hover{transform:none}
+#stage.m .gb{height:48px;font-size:19px;padding:0 18px;gap:10px}
+#stage.m .gb.sm{height:40px;font-size:16px;padding:0 13px}
+#stage.m .gb svg{width:20px;height:20px}
+#stage.m .disp,#stage.m .htitle{letter-spacing:.005em}
+#stage.m .menubg{background-image:url(../assets/scenes/shop-m3.jpg);background-size:cover;filter:blur(5px) brightness(.34);transform:scale(1.05)}
+
+/* the tab bar and Back */
+#mTabs{display:none}
+#stage.m[data-scr=title] #mTabs,#stage.m[data-scr=build] #mTabs,#stage.m[data-scr=stats] #mTabs,#stage.m[data-scr=settings] #mTabs{display:flex}
+#stage.m #mTabs{position:absolute;left:0;right:0;bottom:0;z-index:45;height:calc(var(--sab) + 58px);padding:6px 8px var(--sab);background:rgba(10,11,14,.97);border-top:1px solid rgba(255,255,255,.08)}
+#stage.m #mTabs button{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;background:none;border:0;color:#9aa0a8;font:800 11px 'Barlow Condensed';letter-spacing:.12em;text-transform:uppercase}
+#stage.m #mTabs button svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+#stage.m #mTabs button.on{color:var(--acc)}
+#stage.m .gback{left:12px;top:calc(var(--sat) + 4px);height:40px;font-size:17px;padding:0 14px}
+#stage.m[data-scr=build] .gback,#stage.m[data-scr=stats] .gback,#stage.m[data-scr=settings] .gback{display:none}
+
+/* menu screens: one scrolling column */
+#stage.m .screen:not(#s-duel):not(#s-load){overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+#stage.m .htitle{position:relative;left:auto;top:auto;font-size:44px;line-height:1;padding:calc(var(--sat) + 52px) 20px 12px}
+#stage.m[data-scr=build] .htitle,#stage.m[data-scr=stats] .htitle,#stage.m[data-scr=settings] .htitle{padding-top:calc(var(--sat) + 14px)}
+
+/* home */
+#stage.m #s-title .ttl-logo{left:20px;top:calc(var(--sat) + 10px);gap:10px}
+#stage.m #s-title .ttl-logo img{width:46px;height:46px}
+#stage.m #s-title .ttl-word{font-size:30px}
+#stage.m #s-title .ttl-sub{font-size:13px}
+#stage.m #s-title .heroes{left:50%;right:auto;top:calc(var(--sat) + 76px);width:300px;height:280px;margin-left:-150px}
+#stage.m #s-title .heroes .card{width:170px;height:248px;border-radius:7px;box-shadow:0 0 0 2px #fff,0 20px 40px rgba(0,0,0,.8)}
+#stage.m #s-title .heroes .h1{left:4px;top:24px}
+#stage.m #s-title .heroes .h2{left:120px;top:6px}
+#stage.m #mainMenu{left:20px;right:20px;top:calc(var(--sat) + 380px);width:auto;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+#stage.m #mainMenu .mi{position:relative;isolation:isolate;justify-content:center;height:54px;font:italic 900 22px 'Barlow Condensed';text-transform:uppercase;color:#fff;transform:none;gap:6px}
+#stage.m #mainMenu .mi::after{display:none}
+#stage.m #mainMenu .mi::before{display:block;content:"";position:absolute;inset:0;z-index:-1;transform:skewX(-10deg);background:#1d2127;border-radius:3px;clip-path:none;box-shadow:inset 0 -3px 0 rgba(255,255,255,.06),0 8px 18px rgba(0,0,0,.45)}
+#stage.m #mainMenu .mi[data-go=format]{grid-column:1/-1;height:68px;font-size:32px;color:#140a04}
+#stage.m #mainMenu .mi[data-go=format]::before{background:var(--acc);box-shadow:0 10px 26px -8px rgba(255,106,31,.9)}
+#stage.m #mainMenu .mi[data-go=stats],#stage.m #mainMenu .mi[data-go=settings]{display:none}
+#stage.m #mainMenu .mi.lock{color:rgba(255,255,255,.4)}
+#stage.m #mainMenu .mi .soon{font:800 11px 'Barlow Condensed';letter-spacing:.1em;text-transform:uppercase;color:var(--acc-hi)}
+#stage.m #s-title .savenote{left:20px;right:20px;bottom:calc(var(--sab) + 70px);top:auto;width:auto;font-size:12px;text-align:center;line-height:1.4}
+#stage.m #s-title .legal{left:20px;right:20px;bottom:calc(var(--sab) + 104px);width:auto;font-size:10px;text-align:center;line-height:1.35}
+
+/* format */
+#stage.m .fmt-row{position:relative;left:auto;right:auto;top:auto;bottom:auto;display:flex;flex-direction:column;gap:16px;padding:0 20px 30px}
+#stage.m .fmt{height:250px}
+#stage.m .fmt .txt{left:20px;right:20px;bottom:18px}
+#stage.m .fmt h3{font-size:54px}
+#stage.m .fmt p{font-size:15px;margin-top:6px}
+#stage.m .fmt .tg{left:20px;top:16px;font-size:12px}
+#stage.m .fmt.sel{transform:none}
+
+/* decks */
+#stage.m #s-deck{padding-bottom:calc(var(--sab) + 80px)}
+#stage.m .dk-wrap{position:relative;left:auto;top:auto;bottom:auto;width:auto;padding:0 14px;gap:10px}
+#stage.m .seg-tabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;gap:6px;padding:2px 4px}
+#stage.m .seg-tabs .gb{flex:none}
+#stage.m .dk-list{flex:none;max-height:236px;padding:2px 4px}
+#stage.m .dk{min-height:64px;gap:10px;padding:0 12px 0 8px}
+#stage.m .dk-side{position:relative;right:auto;top:auto;bottom:auto;width:auto;margin:14px 14px 0;padding:18px 16px}
+#stage.m .dk-side h3{font-size:30px}
+#stage.m .dk-side p{font-size:14px}
+#stage.m #s-deck .keybar{position:absolute;left:0;right:0;bottom:0;height:auto;padding:12px 16px calc(var(--sab) + 8px);background:linear-gradient(transparent,rgba(0,0,0,.92) 30%);z-index:5}
+#stage.m #s-deck .keybar{position:fixed}
+#stage.m #duelGo{flex:1;height:58px;font-size:28px;justify-content:center}
+
+/* settings */
+#stage.m .vlist{position:relative;left:auto;right:auto;top:auto;margin:0 12px}
+#stage.m .vrow{height:auto;min-height:64px;padding:8px 12px;font-size:21px;flex-wrap:wrap}
+#stage.m .vrow .dots{display:none}
+#stage.m .vrow .val{margin-left:auto;gap:4px}
+#stage.m .vrow .val .vt{width:110px}
+#stage.m .vrow .arr{font-size:26px;padding:6px 12px}
+#stage.m .vrow .blocks i{width:9px;height:22px}
+#stage.m .vrow .blocks{gap:3px}
+#stage.m .vdesc{position:relative;left:auto;right:auto;bottom:auto;margin:14px 12px calc(var(--sab) + 80px);font-size:15px;padding:12px 14px}
+
+/* stats */
+#stage.m .sfmt{position:relative;left:auto;right:auto;top:auto;margin:0 16px 10px;display:flex}
+#stage.m .savebar{position:relative;left:auto;translate:none;top:auto!important;margin:0 16px 12px;font-size:12px;line-height:1.35;padding:8px 12px;white-space:normal}
+#stage.m #stBody{position:relative;left:auto;right:auto;top:auto;bottom:auto;padding:0 12px calc(var(--sab) + 80px);font-size:14px}
+#stage.m #stBody table{font-size:13px;width:100%}
+#stage.m #stBody .tiles,#stage.m #stBody [class*=grid]{grid-template-columns:repeat(2,1fr)!important}
+#stage.m #stBody *{max-width:100%}
+
+/* results */
+#stage.m #s-results{padding:calc(var(--sat) + 20px) 16px calc(var(--sab) + 20px)}
+#stage.m .res-hero{position:relative;left:auto;top:auto}
+#stage.m .res-hero .disp{font-size:78px}
+#stage.m .res-hero p{font-size:16px;margin-top:6px}
+#stage.m .tiles{position:relative;left:auto;top:auto;margin-top:16px;grid-template-columns:repeat(3,1fr);gap:8px}
+#stage.m .tiles>*{min-width:0;padding:10px 6px!important}
+#stage.m .tiles .disp,#stage.m .tiles b{font-size:30px!important}
+#stage.m .review{position:relative;right:auto;top:auto;bottom:auto;width:auto;margin-top:14px;padding:16px}
+#stage.m .review p,#stage.m .review li{font-size:14px}
+#stage.m .review h4{font-size:19px}
+#stage.m .res-btns{position:relative;left:auto;top:auto;margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+#stage.m .res-btns .gb{justify-content:center}
+#stage.m .res-btns .gb.pri{grid-column:1/-1;height:58px;font-size:26px}
+
+/* loading */
+#stage.m #s-load .coin{width:120px;height:120px;font-size:60px}
+#stage.m #s-load .disp{font-size:44px!important}
+
+/* deck builder: Cards and Your deck are tabs */
+#stage.m #s-build{overflow:hidden!important}
+#stage.m #s-build .savebar{display:none}
+#stage.m .board{height:auto;flex-wrap:wrap;padding-top:var(--sat);border-bottom-width:3px}
+#stage.m .board .cell{padding:6px 12px;border-right:0}
+#stage.m .board .cell.name{flex:1 1 100%!important;padding:6px 12px 0 64px}
+#stage.m .board .name input{font-size:26px}
+#stage.m .board .cell .k{font-size:11px}
+#stage.m .board .cell .v{font-size:24px}
+#stage.m .board .act{flex:1 1 100%;order:5;padding:6px 10px 8px;gap:6px;overflow-x:auto;scrollbar-width:none}
+#stage.m .board .act .gb{flex:none;height:34px;font-size:14px;padding:0 10px}
+#stage.m .board .savebtn{position:absolute;right:10px;top:calc(var(--sat) + 8px);height:40px;padding:0 18px;font-size:22px}
+#stage.m[data-scr=build] .gback{display:inline-flex;top:calc(var(--sat) + 8px);left:8px;width:44px;padding:0;justify-content:center;font-size:0}
+#stage.m .mbtabs{display:flex}
+#stage.m .mbtabs{position:absolute;left:12px;right:12px;top:var(--bt,150px);gap:8px;z-index:3}
+#stage.m .mbtabs button{flex:1;height:38px;border:0;border-radius:3px;transform:skewX(-10deg);background:#1d2127;color:#cfd3d9;font:italic 900 17px 'Barlow Condensed';text-transform:uppercase;letter-spacing:.04em}
+#stage.m .mbtabs button.on{background:var(--acc);color:#140a04}
+.mbtabs{display:none}
+#stage.m .bbar{left:12px;right:12px;width:auto;top:calc(var(--bt,150px) + 48px);gap:8px;row-gap:8px}
+#stage.m .bbar .inp{min-width:0;height:40px;font-size:16px}
+#stage.m .bbar .seg .gb{height:32px;font-size:14px;padding:0 9px}
+#stage.m .bbar #bType{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none}
+#stage.m .pool2{left:8px;right:8px;width:auto;top:calc(var(--bt,150px) + 140px);bottom:calc(var(--sab) + 62px);grid-template-columns:repeat(4,1fr);gap:8px;padding:4px}
+#stage.m .roster{left:0;right:0;top:calc(var(--bt,150px) + 46px);bottom:calc(var(--sab) + 58px);border-left:0;padding:8px 10px;overflow-y:auto;display:none}
+#stage.m #s-build.deckview .roster{display:flex}
+#stage.m #s-build.deckview .pool2,#stage.m #s-build.deckview .bbar{display:none}
+#stage.m .roster .rhead{flex-wrap:wrap;gap:6px 10px}
+#stage.m .roster .lbl{font-size:24px}
+#stage.m .roster .stat{font-size:12px}
+#stage.m .roster .main,#stage.m .roster .extra{grid-template-columns:repeat(5,1fr)!important}
+#stage.m .roster .extra{margin-top:10px}
+#stage.m .roster .howto{position:relative;left:auto;top:auto;translate:none;width:auto;padding:16px}
+#stage.m .roster .howto h4{font-size:28px}
+#stage.m .roster .howto .tip{font-size:14px;flex-direction:column;gap:2px}
+#stage.m .roster .howto .tip b{width:auto;font-size:15px}
+#stage.m .roster .dropme b{font-size:26px}
+#stage.m .czoom,#stage.m .czoom.left,#stage.m .czoom.right{left:0;right:0;top:calc(var(--bt,150px) + 46px);bottom:calc(var(--sab) + 58px);width:auto;flex-direction:column;align-items:center;gap:12px;padding:16px;overflow-y:auto}
+#stage.m .czoom .zc{height:auto;width:200px;max-height:none;flex:none}
+#stage.m .czoom .zi{min-height:0;width:100%}
+#stage.m .czoom h3{font-size:28px}
+#stage.m .czoom p{font-size:15px;max-height:none}
+#stage.m .czoom .btns .gb{flex:1;justify-content:center}
+
+/* every dialog is a sheet from the bottom */
+#stage.m .dlg,#stage.m .pmenu{left:0;right:0;top:auto;bottom:0;translate:none;min-width:0;max-width:none;width:auto!important;max-height:85%;overflow-y:auto;padding:22px 18px calc(var(--sab) + 18px);border-radius:18px 18px 0 0}
+#stage.m .dlg h3{font-size:26px}
+#stage.m .dlg .sub{font-size:15px}
+#stage.m .dlg .btns .gb{flex:1;justify-content:center}
+#stage.m .pmenu .pset{width:auto}
+#stage.m .pmenu .vrow{height:auto;min-height:56px;font-size:19px}
+#stage.m .mydecks{width:auto}
+#stage.m .mydecks .mdr{flex-wrap:wrap}
+#stage.m .tinp{font-size:16px}
+#stage.m .toast{top:calc(var(--sat) + 140px);font-size:15px;padding:10px 18px;white-space:normal;max-width:350px;text-align:center}
+#stage.m .snote,#stage.m .chk{font-size:14px}
+
+/* deck lists and piles: full screen */
+#stage.m .dlist{left:0;right:0;top:0;bottom:0;translate:none;width:auto;height:auto;padding:calc(var(--sat) + 10px) 12px calc(var(--sab) + 10px);border-radius:0}
+#stage.m .dlist .head{flex-wrap:wrap;gap:8px}
+#stage.m .dlist .head h3{font-size:24px!important;flex:1 1 100%}
+#stage.m .dlist .body{overflow-y:auto}
+#stage.m .dlist .fitgrid,#stage.m .dlist .grid{grid-template-columns:repeat(5,1fr)!important;gap:6px}
+#stage.m .dlist .fitgrid .dl,#stage.m .dlist .grid .dl{width:auto!important;font-size:0}
+#stage.m .dlist .fitgrid .card,#stage.m .dlist .grid .card{width:100%!important;height:auto!important;aspect-ratio:421/614}
+#stage.m .dlist .peek{left:0;right:0;bottom:0;width:auto;padding:14px 16px calc(var(--sab) + 14px);display:flex;flex-wrap:wrap;gap:4px 14px;max-height:50%;overflow-y:auto}
+#stage.m .dlist .peek .card{width:90px;height:131px;margin:0}
+#stage.m .dlist .peek h4{font-size:19px;margin:0;flex:1}
+#stage.m .dlist .peek .meta,#stage.m .dlist .peek p{flex:1 1 100%;font-size:13px}
+
+/* ---------- the duel ---------- */
+#stage.m #scene{background:url(../assets/scenes/shop-m3.jpg) var(--gox,0px) var(--goy,0px)/var(--gw,390px) var(--gh,845px) no-repeat,url(../assets/scenes/shop-m3.jpg) center/cover;background-color:#2b170c}
+#stage.m #gl{width:var(--gw,390px);height:var(--gh,845px);inset:auto;left:var(--gox,0px);top:var(--goy,0px)}
+#stage.m #inspect{display:none!important}
+/* the computer: a bar at the top with its hand under it; you: a bar at the bottom */
+#stage.m .lp{width:auto;height:58px;gap:10px;padding:0 14px 0 10px}
+#stage.m .lp.op{left:12px;right:12px;top:calc(var(--sat) + 2px);flex-direction:row;text-align:left;padding:0 14px 0 10px}
+#stage.m .lp.me{left:12px;right:12px;bottom:calc(var(--sab) + 6px);padding-right:70px}
+#stage.m .lp .em{width:40px;height:40px}
+#stage.m .lp .who{font-size:11px}
+#stage.m .lp .num{font-size:36px;margin-left:auto}
+#stage.m .lp>div:nth-child(2){flex:1;display:flex;flex-direction:column}
+#stage.m .lp .num{align-self:flex-end;margin-top:-16px}
+#stage.m .lp .bar{justify-content:flex-end;margin-top:3px;flex-direction:row!important}
+#stage.m .lp .bar i{width:11px;height:4px}
+#stage.m .lp .hcnt{order:-1;margin:0;font-size:9px;display:none}
+#stage.m .ohand{left:0;width:390px;margin:0;top:calc(var(--sat) + 62px);height:48px}
+#stage.m .ohand .card{width:26px;height:38px;transform-origin:50% 0}
+#stage.m #tMenu{left:auto;right:20px;top:auto;bottom:calc(var(--sab) + 15px);height:40px;width:44px;padding:0;justify-content:center;font-size:0;z-index:12}
+/* the row between the board and your hand: turn, log, hint and the phase button; your card's moves take its place */
+#stage.m .turnm,#stage.m .dial{position:absolute;translate:none;top:auto;bottom:var(--row);height:48px}
+#stage.m .turnm{left:16px!important;width:58px}
+#stage.m .dial{left:auto!important;right:16px;width:108px}
+#stage.m .turnm b{font-size:26px}
+#stage.m .dial .p{font-size:22px}
+#stage.m .dial .s,#stage.m .turnm span{font-size:9px;letter-spacing:.14em}
+#stage.m .tools{left:84px;right:134px;bottom:var(--row);gap:8px;justify-content:flex-start}
+#stage.m .tools .gb.ico{width:44px;height:44px}
+#stage.m #tSpeed,#stage.m #tSound{display:none}
+#stage.m #tHint{height:44px;font-size:17px;padding:0 12px}
+#stage.m #s-duel.acting .turnm,#stage.m #s-duel.acting .dial,#stage.m #s-duel.acting .tools{visibility:hidden}
+#stage.m .hand{left:0;width:390px;margin:0;bottom:calc(var(--sab) + 72px);height:190px;pointer-events:none}
+#stage.m .hc{width:86px;height:125px;bottom:0;border-radius:5px}
+#stage.m .hc:hover:not(.up){bottom:0}
+#stage.m .hc.up{bottom:46px}
+#stage.m .hand.low .hc{bottom:-80px!important}
+#stage.m .prompt{top:calc(var(--sat) + 112px);height:auto;min-height:34px;padding:6px 14px 6px 18px;font-size:14px;white-space:normal;max-width:360px;text-align:center;line-height:1.2}
+#stage.m .chainp{left:12px;right:12px;top:calc(var(--sat) + 150px);width:auto;padding:6px 8px;display:flex;gap:6px;max-height:none;overflow-x:auto;scrollbar-width:none}
+#stage.m .chainp.hidden{display:none}
+#stage.m .chainp .ph{display:none}
+#stage.m .chainp .link{flex:0 0 auto;max-width:170px;gap:6px;padding:0;margin:0}
+#stage.m .chainp .link .no{font-size:22px}
+#stage.m .chainp .link .card{width:24px;height:35px}
+#stage.m .chainp .link .t{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px}
+#stage.m .chainp .link .s{font-size:10px}
+#stage.m .st{font-size:11px;padding:1px 5px 2px}
+#stage.m .ct{font-size:12px;min-width:18px;height:18px;padding:0 4px}
+#stage.m .banner{top:38%;height:86px}
+#stage.m .banner .disp{font-size:44px}
+#stage.m .banner .sub{font-size:12px;bottom:6px}
+#stage.m .pop{font-size:38px}
+/* your card's moves, the phase choices and responses: big buttons in the row */
+#stage.m .amenu.mrow,#stage.m .dial-menu.mrow,#stage.m .amenu.respond{left:12px!important;right:12px!important;top:auto!important;bottom:calc(var(--row) - 4px)!important;width:auto;padding:0;flex-direction:row;flex-wrap:wrap;gap:8px;background:none}
+#stage.m .amenu.mrow::before,#stage.m .amenu.mrow::after,#stage.m .amenu.respond::before,#stage.m .amenu.respond::after{display:none}
+#stage.m .amenu.mrow .gb,#stage.m .dial-menu.mrow .gb,#stage.m .amenu.respond .gb{flex:1 1 40%;width:auto;height:50px;font-size:18px;justify-content:center}
+#stage.m .amenu.mrow .gb.rd{flex:0 0 74px}
+#stage.m .amenu.respond .ph{display:none}
+#stage.m .amenu.respond{bottom:calc(var(--row) - 4px)!important}
+/* hint and log */
+#stage.m .hintp,#stage.m .logp{left:12px;right:12px;top:calc(var(--sat) + 70px);width:auto;max-height:60%;overflow-y:auto}
+#stage.m .logp{height:60%}
+#stage.m .hintp .play{font-size:20px}
+#stage.m .hintp ul{font-size:14px}
+/* hold to read a card */
+.msheet{position:absolute;left:0;right:0;bottom:0;z-index:70;max-height:82%;overflow-y:auto;padding:10px 18px calc(var(--sab,10px) + 16px);background:linear-gradient(#17191e,#0e0f13);border-radius:22px 22px 0 0;box-shadow:0 -20px 50px rgba(0,0,0,.6);animation:msup .22s cubic-bezier(.2,.8,.2,1);transition:transform .15s}
+@keyframes msup{from{transform:translateY(40%);opacity:0}}
+.msheet .grab{width:40px;height:5px;border-radius:3px;background:rgba(255,255,255,.25);margin:0 auto 14px}
+.msheet .mtop{display:flex;gap:14px}
+.msheet .card{width:140px;height:204px;flex:none;border-radius:6px;background:center/cover;box-shadow:0 12px 26px rgba(0,0,0,.7)}
+.msheet h3{font:italic 900 26px 'Barlow Condensed';text-transform:uppercase;line-height:1}
+.msheet .meta{font:800 12px 'Barlow Condensed';letter-spacing:.1em;text-transform:uppercase;color:var(--acc-hi);margin-top:6px}
+.msheet .num{font:italic 900 30px 'Barlow Condensed';margin-top:10px}.msheet .num i{opacity:.5;font-size:20px}
+.msheet p{font-size:15px;line-height:1.45;color:rgba(246,242,236,.92);margin:12px 0 16px;white-space:pre-line}
+.msheet .gb{justify-content:center}
+.veil.msv{z-index:69;background:rgba(5,6,8,.55)}
+/* the duel menu and dialogs keep the sheet style above */
+#stage.m .pmenu .opts .gb{justify-content:center}
+#stage.m #mainMenu .mi[data-href]{grid-column:1/-1;height:46px;font-size:19px}
+#stage.m #s-title .savenote{border:0;padding:0;background:none}
+#stage.m #mTabs button[data-tab=title].on svg{stroke:var(--acc)}
+#stage.m .dk-fan{height:150px;width:640px;transform:scale(.6);transform-origin:0 0;margin-bottom:-60px}
+#stage.m .dk-side .row{flex-wrap:wrap;gap:8px;margin-top:12px}
+#stage.m .dk-side .row .lb{width:100%;font-size:11px}
+#stage.m .dk-side .row .seg{display:flex;flex-wrap:wrap;gap:6px}
+#stage.m .dk-side .row .gb{flex:none}
+#stage.m .dk .strip{width:76px;height:44px}
+#stage.m .dk .nm{font-size:18px}
+#stage.m .dk .pl{font-size:12px}
+#stage.m .dk .tags .tg{font-size:10px}
+#stage.m .amenu.mrow,#stage.m .dial-menu.mrow,#stage.m .amenu.respond{flex-wrap:wrap-reverse}
+#stage.m .amenu.mrow .gb,#stage.m .dial-menu.mrow .gb,#stage.m .amenu.respond .gb{flex:1 1 0;min-width:30%}
+#stage.m .amenu.mrow .gb.rd{flex:0 0 74px;min-width:0}
+#stage.m .toast{top:40%}
+#stage.m .prompt{display:block}
+#stage.m .lp{z-index:11}
+#stage.m .hand.low .hc{bottom:-60px!important}
+.prompt .pcx{margin-left:10px;padding:3px 10px;border:0;border-radius:2px;background:#2a2f37;color:#fff;font:800 13px 'Barlow Condensed';letter-spacing:.08em;text-transform:uppercase;cursor:pointer;pointer-events:auto}
+#stage.m .hand{z-index:6}
+#stage.m .czoom .zc{width:160px}
+#stage.m .czoom p{overflow:visible;flex:none;max-height:none!important}
+#stage.m .czoom .cnt{margin-top:10px;padding-top:0}
+#stage.m .sttiles{grid-template-columns:repeat(4,1fr)!important;gap:6px;margin-bottom:12px}
+#stage.m .sttiles .tile{height:auto;min-height:62px;padding:8px 6px;min-width:0}
+#stage.m .sttiles .n,#stage.m .sttiles .tile .disp{font-size:22px!important;line-height:1;white-space:nowrap}
+#stage.m .sttiles .tile *{font-size:10px}
+#stage.m .stcols{display:flex!important;flex-direction:column;gap:12px}
+#stage.m .stbox{padding:12px!important;overflow-x:auto}
+#stage.m .sttab{font-size:12px}
+#stage.m .sttab th{font-size:9px;padding:4px;white-space:nowrap}
+#stage.m .sttab td{padding:6px 4px}
+
+/* home on phones: a single column (logo, cards, buttons, small print) that never overlaps, whatever the phone's height
+   (Zack, 2026-11-24: "the big buttons are overlapping the disclaimer text") */
+#stage.m #s-title{display:none;flex-direction:column;align-items:stretch;padding:calc(var(--sat) + 10px) 20px calc(var(--sab) + 74px);overflow-y:auto}
+#stage.m #s-title.on{display:flex}
+#stage.m #s-title .menubg{position:absolute}
+#stage.m #s-title .ttl-logo,#stage.m #s-title .heroes,#stage.m #s-title #mainMenu,#stage.m #s-title .legal,#stage.m #s-title .savenote{position:relative;left:auto;right:auto;top:auto;bottom:auto;margin-left:0}
+#stage.m #s-title .heroes{flex:0 1 270px;min-height:150px;width:auto;height:auto;margin:14px 0 18px;display:flex;justify-content:center;align-items:center}
+#stage.m #s-title .heroes .card{position:relative;left:auto!important;top:auto!important;height:min(248px,100%);width:auto;aspect-ratio:421/614}
+#stage.m #s-title .heroes .h1{transform:rotate(-8deg) translateX(18px);z-index:1}
+#stage.m #s-title .heroes .h2{transform:rotate(7deg) translateX(-18px);z-index:2}
+#stage.m #s-title #mainMenu{width:auto;flex:none}
+#stage.m #s-title .legal{margin-top:auto;padding-top:18px;width:auto}
+#stage.m #s-title .savenote{margin-top:8px;width:auto}
+#stage.m .vrow .arr svg{width:20px;height:20px}
+#stage.m #s-title .ttl-logo{order:1}
+#stage.m #s-title .heroes{order:2}
+#stage.m #s-title #mainMenu{order:3}
+#stage.m #s-title .savenote{order:4;margin-top:auto;padding-top:18px}
+#stage.m #s-title .legal{order:5;margin-top:8px;padding-top:0}
+
+/* your bar: a long deck name stops short of your Life Points (Zack, 2026-11-24) */
+#stage.m .lp .who{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:118px}
+/* the Hint button: the bulb, the word and the number left, no wider than its spot in the row */
+#stage.m #tHint{padding:0 10px;gap:5px;font-size:16px;flex:none}
+#stage.m #tHint .left{font-size:0;margin-left:2px}
+#stage.m #tHint .left b{font:900 13px 'Barlow Condensed';background:var(--acc);color:#140a04;padding:1px 6px;border-radius:2px}
+#stage.m .tools{right:136px;overflow:hidden}
+/* bigger hand cards */
+#stage.m .hc{width:96px;height:140px}
+#stage.m .hand{height:200px}
+#stage.m .hc.up{bottom:40px}
+#stage.m .logp .x{right:8px;top:8px}
+#stage.m .lp>div:nth-child(2){min-width:0}
+
+/* ---------- the duel, second pass (Zack, 2026-11-24: "take all these findings/bugs and really optimize the mobile experience as a whole") ----------
+   The prompt is a slim strip on the board's center line (the gap between the two fields), never over a zone or the computer's hand.
+   The chain strip sits where the computer's hand is, only while a chain is open. */
+#stage.m .prompt{top:var(--midy,380px);translate:-50% -50%;min-height:0;height:auto;max-width:372px;padding:4px 12px 4px 14px;font-size:12px;line-height:1.15;letter-spacing:.04em;white-space:normal;display:block;text-align:center;opacity:.96;z-index:7}
+#stage.m .prompt::before{box-shadow:inset 4px 0 0 var(--acc),0 6px 14px rgba(0,0,0,.45);background:rgba(12,14,18,.9)}
+#stage.m .prompt.wait::before{box-shadow:inset 4px 0 0 var(--opp),0 6px 14px rgba(0,0,0,.45)}
+#stage.m .prompt .pcx{font-size:11px;padding:2px 8px;margin-left:6px}
+#stage.m .chainp{top:calc(var(--sat) + 62px);z-index:8;background:none}
+#stage.m .toast{top:calc(var(--midy,380px) - 70px);font-size:14px}
+#stage.m .pop{font-size:34px;z-index:13}
+#stage.m .toast{top:calc(var(--sat) + 116px);font-size:13px;padding:7px 14px;max-width:340px;line-height:1.3}
+#stage.m .prompt{top:var(--py,var(--midy,380px))}
+#stage.m .toast{top:auto;bottom:calc(var(--sab) + 300px)}
+/* short phones: no band above the board, so the prompt is one line on the center line */
+#stage.m.mline .prompt{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:360px;font-size:11px;padding:3px 10px}
+/* banished piles: a button in each player's bar */
+#stage.m .banb{display:inline-flex;align-items:center;gap:4px;align-self:flex-start;margin-top:4px;height:20px;padding:0 7px;border:0;border-radius:2px;background:#2a2f37;color:#cfd3d9;font:800 10px 'Barlow Condensed';letter-spacing:.1em;text-transform:uppercase}
+#stage.m .banb[hidden]{display:none}
+#stage.m .banb b{color:var(--acc-hi);font-size:12px}
+#stage.m .lp .num{margin-top:-30px}
+/* phones: dialogs and menus are sheets, so they slide up from the bottom and back down */
+#stage.m .dlg,#stage.m .pmenu{animation:sheetUp .3s cubic-bezier(.2,.8,.2,1)}
+#stage.m .dlg.out,#stage.m .pmenu.out{animation:sheetDown .2s ease forwards!important}
+#stage.m .msheet.out{animation:sheetDown .2s ease forwards!important}
+#stage.m .dlist{animation:sheetUp .3s cubic-bezier(.2,.8,.2,1)}
+#stage.m .dlist.out{animation:sheetDown .2s ease forwards!important}
+#stage.m .amenu.mrow,#stage.m .dial-menu.mrow,#stage.m .amenu.respond{animation:rowIn .2s cubic-bezier(.2,.8,.2,1)}
+#stage.m .screen.on:not(#s-duel){animation:mScrIn .3s cubic-bezier(.2,.8,.2,1)}
+#stage.m .czoom{animation:sheetUp .26s cubic-bezier(.2,.8,.2,1)}
+#stage.m #s-build.deckview .roster,#stage.m #s-build:not(.deckview) .pool2{animation:fadeIn .2s ease}
+@keyframes sheetUp{from{transform:translateY(100%)}}
+@keyframes sheetDown{to{transform:translateY(100%)}}
+@keyframes rowIn{from{opacity:0;transform:translateY(10px)}}
+@keyframes mScrIn{from{opacity:0;transform:translateX(24px)}}
+#stage.m #s-title.leaving{display:flex}
+
+/* =====================================================================================================
+   Phones held sideways (#stage.m.ml; Zack, 2026-11-25: "it needs to match the mobile ui but be formatted for landscape"): the same
+   phone UI on a stage 390 points tall. Duel: the board in the middle (the landscape render), a left column with both bars, the chain
+   and the prompt, a right column with the menu, turn, phase button, log and Hint (your card's buttons take its place), your hand
+   along the bottom. Menu screens use the width: two columns where it helps, a slimmer tab bar.
+   ===================================================================================================== */
+#stage.ml{--sab:max(env(safe-area-inset-bottom,0px),6px);--sal:max(env(safe-area-inset-left,0px),10px);--sar:max(env(safe-area-inset-right,0px),10px)}
+#stage.ml #scene{background:url(../assets/scenes/shop.jpg) var(--gox,0px) var(--goy,0px)/var(--gw) var(--gh) no-repeat,url(../assets/scenes/shop.jpg) center/cover;background-color:#2b170c}
+#stage.ml .menubg{background-image:url(../assets/scenes/shop.jpg)}
+/* left column */
+#stage.ml .lp{width:176px;height:50px;padding:0 10px 0 8px;gap:8px}
+#stage.ml .lp.op{left:var(--sal);right:auto;top:8px}
+#stage.ml .lp.me{left:var(--sal);right:auto;bottom:8px;padding-right:10px}
+#stage.ml .lp .em{width:32px;height:32px}
+#stage.ml .lp .num{font-size:28px;margin-top:-24px}
+#stage.ml .lp .who{font-size:10px;padding-right:64px}
+#stage.ml .lp .bar i{width:8px;height:3px}
+#stage.ml .banb{height:17px;font-size:9px;margin-top:2px}
+#stage.ml .chainp{left:var(--sal);right:auto;top:66px;width:176px;flex-direction:column;align-items:stretch;gap:4px;max-height:150px;overflow-y:auto}
+#stage.ml .chainp .link{max-width:none}
+#stage.ml .prompt,#stage.ml.mline .prompt{left:var(--sal);top:auto;bottom:66px;translate:none;width:176px;max-width:176px;white-space:normal;text-align:left;font-size:12px;padding:6px 10px 6px 14px;overflow:visible}
+/* the computer's hand: small backs at the top, over the board's middle */
+#stage.ml .ohand{left:0;width:var(--sw);top:-6px;height:40px}
+#stage.ml .ohand .card{width:22px;height:32px}
+/* right column */
+#stage.ml #tMenu{right:var(--sar);left:auto;top:8px;bottom:auto}
+#stage.ml .turnm{left:auto!important;right:calc(var(--sar) + 54px);top:8px;bottom:auto;width:56px;height:42px}
+#stage.ml .dial{left:auto!important;right:var(--sar);top:calc(50% - 30px);bottom:auto;width:112px;height:52px}
+#stage.ml .tools{left:auto;right:var(--sar);bottom:8px;width:auto;gap:6px}
+#stage.ml .amenu.mrow,#stage.ml .dial-menu.mrow,#stage.ml .amenu.respond{left:auto!important;right:var(--sar)!important;bottom:8px!important;top:auto!important;width:150px;flex-direction:column;flex-wrap:nowrap;gap:6px}
+#stage.ml .amenu.mrow .gb,#stage.ml .dial-menu.mrow .gb,#stage.ml .amenu.respond .gb{flex:none;width:100%;min-width:0;height:42px;font-size:16px}
+#stage.ml .amenu.mrow .gb.rd{flex:none;width:100%}
+/* your hand */
+#stage.ml .hand{left:0;width:var(--sw);bottom:0;height:150px}
+#stage.ml .hc{width:74px;height:108px;bottom:-56px}
+#stage.ml .hc:hover:not(.up){bottom:-56px}
+#stage.ml .hc.up{bottom:10px}
+#stage.ml .hand.low .hc{bottom:-92px!important}
+#stage.ml .toast{bottom:auto;top:52px;left:var(--cx);max-width:420px}
+#stage.ml .hintp,#stage.ml .logp{left:auto;right:calc(var(--sar) + 140px);top:8px;width:360px;max-height:calc(100% - 16px)}
+#stage.ml .logp{height:calc(100% - 16px)}
+#stage.ml .banner{top:calc(50% - 40px);height:76px}
+#stage.ml .banner .disp{font-size:40px}
+/* sheets are centred and no wider than a phone held upright */
+#stage.ml .msheet,#stage.ml .dlg,#stage.ml .pmenu{left:0;right:0;margin:0 auto;max-width:560px;max-height:92%}
+#stage.ml .msheet .mtop{float:left;margin:0 16px 8px 0}
+#stage.ml .msheet .card{width:120px;height:175px}
+#stage.ml .msheet .mh{min-width:0}
+#stage.ml .msheet p{margin-top:10px}
+#stage.ml .msheet .gb{clear:both}
+/* menu screens */
+#stage.ml #mTabs{height:calc(var(--sab) + 46px);padding:4px 12px var(--sab)}
+#stage.ml #mTabs button{flex-direction:row;gap:8px;font-size:12px}
+#stage.ml #mTabs button svg{width:20px;height:20px}
+#stage.ml .htitle{padding:calc(var(--sat) + 6px) 24px 8px 76px;font-size:34px}
+#stage.ml[data-scr=build] .htitle,#stage.ml[data-scr=stats] .htitle,#stage.ml[data-scr=settings] .htitle{padding-left:24px}
+#stage.ml .gback{top:8px;left:var(--sal)}
+/* home: the buttons on the left, the two cards on the right */
+#stage.ml #s-title.on,#stage.ml #s-title.leaving{display:grid}
+#stage.ml #s-title{grid-template-columns:1fr minmax(220px,38%);grid-template-rows:auto auto 1fr auto auto;column-gap:24px;padding:10px calc(var(--sar) + 16px) calc(var(--sab) + 54px) calc(var(--sal) + 16px)}
+#stage.ml #s-title .ttl-logo{grid-column:1;grid-row:1}
+#stage.ml #s-title #mainMenu{grid-column:1;grid-row:2;margin-top:12px}
+#stage.ml #s-title #mainMenu .mi[data-go=format]{height:56px;font-size:28px}
+#stage.ml #s-title #mainMenu .mi{height:44px}
+#stage.ml #s-title .savenote{grid-column:1;grid-row:4;margin-top:8px;padding-top:0}
+#stage.ml #s-title .legal{grid-column:1;grid-row:5}
+#stage.ml #s-title .heroes{grid-column:2;grid-row:1/6;margin:0;min-height:0;height:100%}
+#stage.ml #s-title .heroes .card{height:min(230px,82%)}
+/* format: side by side */
+#stage.ml .fmt-row{flex-direction:row;padding:0 calc(var(--sar) + 16px) 70px calc(var(--sal) + 16px)}
+#stage.ml .fmt{flex:1;height:230px}
+/* decks: the list on the left, the chosen deck on the right */
+#stage.ml #s-deck.on,#stage.ml #s-deck.leaving{display:grid}
+#stage.ml #s-deck{grid-template-columns:1fr 1fr;grid-template-rows:auto 1fr;align-items:start;column-gap:10px;padding-bottom:calc(var(--sab) + 70px)}
+#stage.ml #s-deck .htitle{grid-column:1/-1}
+#stage.ml .dk-wrap{grid-column:1;padding-left:calc(var(--sal) + 6px)}
+#stage.ml .dk-list{max-height:none}
+#stage.ml .dk-side{grid-column:2;margin:0 calc(var(--sar) + 6px) 0 0}
+#stage.ml #s-deck .keybar{left:auto;width:260px;right:0;background:none}
+/* settings and stats: a comfortable width */
+#stage.ml .vlist,#stage.ml .vdesc{max-width:640px;margin-left:auto;margin-right:auto}
+#stage.ml .vdesc{margin-bottom:calc(var(--sab) + 60px)}
+#stage.ml #stBody{padding:0 calc(var(--sar) + 12px) calc(var(--sab) + 60px) calc(var(--sal) + 12px)}
+#stage.ml .sttiles{grid-template-columns:repeat(8,1fr)!important}
+#stage.ml .stcols{display:grid!important;grid-template-columns:1fr 1fr}
+#stage.ml .sfmt,#stage.ml #s-stats .savebar{margin-left:calc(var(--sal) + 14px)}
+/* deck builder: more cards across */
+#stage.ml .board{padding-top:4px}
+#stage.ml .board .cell.name{flex:1 1 auto!important;padding-left:64px}
+#stage.ml .board .act{flex:1 1 auto;order:0}
+#stage.ml .board .savebtn{top:6px}
+#stage.ml[data-scr=build] .gback{top:8px}
+#stage.ml .pool2{grid-template-columns:repeat(8,1fr);bottom:calc(var(--sab) + 50px)}
+#stage.ml .roster{bottom:calc(var(--sab) + 48px)}
+#stage.ml .roster .main,#stage.ml .roster .extra{grid-template-columns:repeat(10,1fr)!important}
+#stage.ml .czoom,#stage.ml .czoom.left,#stage.ml .czoom.right{flex-direction:row;align-items:flex-start;bottom:calc(var(--sab) + 48px)}
+#stage.ml .czoom .zc{width:150px}
+/* lists and results */
+#stage.ml .dlist .fitgrid,#stage.ml .dlist .grid{grid-template-columns:repeat(10,1fr)!important}
+#stage.ml .dlist .peek{left:auto;width:360px;max-height:100%}
+#stage.ml #s-results{padding-left:calc(var(--sal) + 16px);padding-right:calc(var(--sar) + 16px)}
+#stage.ml .res-btns{grid-template-columns:1fr 1fr 1fr}
+#stage.ml .res-btns .gb.pri{grid-column:auto;height:48px;font-size:20px}
+#stage.ml .tiles{grid-template-columns:repeat(6,1fr)}
+#stage.ml .lp .who{padding-right:56px}
+#stage.ml .lp .num{font-size:26px}
+#stage.ml .toast{top:66px;left:var(--sal);translate:none;width:176px;max-width:176px;font-size:12px;text-align:left}
+/* landscape card sheet: the card on the left, its name and text beside it */
+#stage.ml .msheet{display:grid;grid-template-columns:120px 1fr;column-gap:16px;align-content:start}
+#stage.ml .msheet .grab,#stage.ml .msheet>.gb{grid-column:1/-1}
+#stage.ml .msheet .mtop{display:contents;float:none;margin:0}
+#stage.ml .msheet .mtop>.card{grid-column:1;grid-row:2/span 2}
+#stage.ml .msheet .mh{grid-column:2;grid-row:2}
+#stage.ml .msheet p{grid-column:2;grid-row:3;margin:8px 0 12px}
+#stage.ml .msheet>.gb{margin-top:6px}
+#stage.ml .msheet{grid-template-rows:auto auto 1fr auto}#stage.ml .msheet p,#stage.ml .msheet .mh{align-self:start}
+/* landscape Deck Builder: one header row, then the tabs, search and filters on one line, so the cards get the height */
+#stage.ml .board{flex-wrap:nowrap;align-items:center;padding:4px 0}
+#stage.ml .board .cell{padding:2px 8px}
+#stage.ml .board .cell:nth-child(4){display:none}
+#stage.ml .board .name input{font-size:20px}
+#stage.ml .board .cell .v{font-size:18px}
+#stage.ml .board .act{flex:0 1 auto;padding:0 6px;order:0}
+#stage.ml .board .act .gb{height:30px;font-size:13px;padding:0 8px}
+#stage.ml .board .savebtn{position:static;height:36px;margin-right:var(--sar);font-size:18px;padding:0 14px}
+#stage.ml .mbtabs{right:auto;width:230px;left:var(--sal)}
+#stage.ml .mbtabs button{height:34px;font-size:15px}
+#stage.ml .bbar{left:calc(var(--sal) + 242px);right:var(--sar);top:var(--bt,60px);flex-wrap:nowrap;gap:6px}
+#stage.ml .bbar .inp{height:34px;font-size:14px;flex:1 1 120px}
+#stage.ml .bbar #bType{flex-basis:auto;order:0}
+#stage.ml .bbar .seg .gb{height:30px;font-size:12px;padding:0 7px}
+#stage.ml .pool2{top:calc(var(--bt,60px) + 44px);left:var(--sal);right:var(--sar);grid-template-columns:repeat(9,1fr)}
+#stage.ml .roster{top:calc(var(--bt,60px) + 42px)}
+#stage.ml .czoom,#stage.ml .czoom.left,#stage.ml .czoom.right{top:calc(var(--bt,60px) + 42px)}
+#stage.ml #s-deck{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+#stage.ml .dk-wrap,#stage.ml .dk-side,#stage.ml .seg-tabs{min-width:0}
+#stage.ml .gback{width:44px;padding:0;justify-content:center;font-size:0}
+#stage.ml .htitle{padding-left:68px}
+#stage.ml .dk-fan{margin-bottom:-46px}
+
+/* ---------- the deck picker on phones (Zack, 2026-11-25: "more intuitive on mobile... an alternating tab for your deck and opponents
+   deck instead of scroll down, and the list of decks needs to be contained so you cant swipe to either side") ----------
+   One screen that never scrolls sideways: the Your deck / Opponent tabs, the tier chips (wrapped, not a sideways strip), the deck list
+   (the only part that scrolls, up and down), the deck-list button, then the computer level and Duel at the bottom. */
+#stage.m #s-deck.on,#stage.m #s-deck.leaving{display:flex!important;flex-direction:column;overflow:hidden!important;touch-action:pan-y;padding-bottom:0}
+#stage.m #s-deck .htitle{flex:none;font-size:30px;padding:calc(var(--sat) + 10px) 20px 8px 70px}
+#stage.m #s-deck .dk-side{display:none}
+#stage.m .mdtabs{display:flex;flex:none;gap:8px;padding:0 14px 10px}
+#stage.m .mdtabs button{flex:1;min-width:0;display:flex;align-items:center;gap:8px;height:58px;padding:0 10px;border:0;border-radius:3px;background:#1d2127;color:#cfd3d9;text-align:left;box-shadow:inset 0 -3px 0 rgba(255,255,255,.06)}
+#stage.m .mdtabs button i{flex:none;width:30px;height:44px;border-radius:2px;background:center/cover}
+#stage.m .mdtabs button span{min-width:0;font:italic 900 16px 'Barlow Condensed';text-transform:uppercase;line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#stage.m .mdtabs button small{display:block;font:800 10px 'Barlow Condensed';font-style:normal;letter-spacing:.14em;color:#9aa0a8}
+#stage.m .mdtabs button.on{background:#262b33;box-shadow:inset 0 -3px 0 var(--acc),0 0 0 1px rgba(255,106,31,.5);color:#fff}
+#stage.m .mdtabs button.on.op{box-shadow:inset 0 -3px 0 var(--opp),0 0 0 1px rgba(79,155,224,.55)}
+#stage.m .mdtabs button.on small{color:var(--acc-hi)}
+#stage.m .mdtabs button.on.op small{color:#9cc4ea}
+#stage.m #s-deck .dk-wrap{flex:1;min-height:0;display:flex;flex-direction:column;padding:0 14px;gap:8px}
+#stage.m #s-deck .seg-tabs{flex:none;flex-wrap:wrap;overflow:visible;gap:5px;padding:0}
+#stage.m #s-deck .seg-tabs .gb{height:30px;font-size:13px;padding:0 9px}
+#stage.m #s-deck .dk-list{flex:1;min-height:0;max-height:none;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;touch-action:pan-y;padding:2px 2px 8px;scrollbar-width:none}
+#stage.m #s-deck .dk{width:100%;min-width:0;transform:none!important}
+#stage.m #s-deck .dk>div:nth-child(2){min-width:0;flex:1}
+#stage.m #s-deck .dk .nm,#stage.m #s-deck .dk .pl{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#stage.m .mdtools{display:flex;flex:none;gap:8px}
+#stage.m .mdtools .gb{flex:1;justify-content:center}
+#stage.m .mdtools #mdRand{flex:none}
+#stage.m .mdfoot{display:block;flex:none;padding:10px 14px 0}
+#stage.m .mdfoot .lvls{display:flex;gap:4px}
+#stage.m .mdfoot .lvls button{flex:1;min-width:0;height:34px;border:0;border-radius:2px;background:#1d2127;color:#cfd3d9;font:800 12px 'Barlow Condensed';letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#stage.m .mdfoot .lvls button.on{background:var(--opp);color:#06121d}
+#stage.m #s-deck .keybar{position:relative!important;flex:none;padding:10px 14px calc(var(--sab) + 8px);background:none}
+/* sideways: the tabs and tools beside the list */
+#stage.ml #s-deck.on,#stage.ml #s-deck.leaving{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);grid-template-rows:auto 1fr auto;column-gap:14px;padding:0 var(--sar) 0 var(--sal)}
+#stage.ml #s-deck .htitle{grid-column:1;grid-row:1;padding:8px 0 6px 58px;font-size:26px}
+#stage.ml .mdtabs{grid-column:1;grid-row:2;flex-direction:column;padding:0;align-self:start}
+#stage.ml #s-deck .dk-wrap{grid-column:2;grid-row:1/3;padding:8px 0 0}
+#stage.ml .mdfoot{grid-column:1;grid-row:3;padding:0 0 6px}
+#stage.ml #s-deck .keybar{grid-column:2;grid-row:3;width:auto;padding:6px 0 calc(var(--sab) + 4px)}
+#stage.ml #duelGo{height:48px;font-size:24px}
+#stage.m .mdtabs,#stage.m .mdfoot,#stage.m .mdtools{position:relative;z-index:2}
+/* the Deck Builder's card view: a solid dark background all the way down, so scrolled text never sits on the cards behind
+   (Zack, 2026-11-25: "the background is transparent so it clashes... needs to have a consistent black background") */
+#stage.m .czoom{background:#0e0f13;box-shadow:0 0 0 100vmax rgba(5,6,8,.6)}
+#stage.m .czoom::before,#stage.m .czoom::after{display:none}
+#stage.m:not(.ml) #s-deck .htitle{padding-left:112px}
+/* sideways deck picker: tabs, level and Duel in the left column, the list (and its button) filling the right */
+#stage.ml #s-deck.on,#stage.ml #s-deck.leaving{grid-template-rows:auto auto 1fr auto auto}
+#stage.ml #s-deck .dk-wrap{grid-row:1/6;min-height:0;overflow:hidden;padding-bottom:calc(var(--sab) + 6px)}
+#stage.ml .mdfoot{grid-row:4;padding:0 0 8px}
+#stage.ml #s-deck .keybar{grid-column:1;grid-row:5}
+#stage.ml .mdtabs button{height:54px}
+#stage.ml #s-deck.on,#stage.ml #s-deck.leaving{grid-template-rows:auto auto minmax(0,1fr) auto auto}#stage.ml #s-deck .dk-wrap{height:100%}
+
+/* Add to home screen (phones only) */
+#stage.m .a2hs{display:flex;align-items:center;gap:12px;position:relative;order:3;margin-top:12px;width:100%;height:56px;padding:0 14px;border:1px dashed rgba(255,106,31,.55);border-radius:4px;background:rgba(255,106,31,.08);color:#fff;text-align:left}
+#stage.m .a2hs[hidden]{display:none}
+#stage.m .a2hs svg{width:26px;height:26px;flex:none;fill:none;stroke:var(--acc);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+#stage.m .a2hs span{font:italic 900 19px 'Barlow Condensed';text-transform:uppercase;letter-spacing:.03em;line-height:1.05}
+#stage.m .a2hs small{display:block;font:500 12px 'Atkinson Hyperlegible';font-style:normal;text-transform:none;letter-spacing:0;color:#9aa0a8}
+#stage.ml #s-title .a2hs{grid-column:1;grid-row:3;align-self:start;height:46px}
+#stage.m .a2step{display:flex;align-items:center;gap:12px;margin-top:12px;font-size:15px;line-height:1.4}
+#stage.m .a2step>b{flex:none;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--acc);color:#140a04;font:italic 900 17px 'Barlow Condensed'}
+#stage.m .a2step span{flex:1}
+#stage.m .a2step svg{width:28px;height:28px;flex:none;fill:none;stroke:#fff;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+#stage.m .mdtabs button i.empty{background:repeating-linear-gradient(45deg,#2a2f37 0 4px,#22262d 4px 8px);border:1px dashed rgba(255,255,255,.25)}
+#stage.m .mdtabs button:not(.on) span{color:#9aa0a8}
+
+/* Add to home screen, in the game's own look (Zack, 2026-11-25: "spruce up the add to home screen button to look cleaner and match our
+   branding"): a slanted Broadcast slab like the other buttons, the icon on an orange tag, the label in the display face */
+#stage.m .a2hs{isolation:isolate;border:0;background:none;height:54px;padding:0 16px 0 10px;gap:12px;border-radius:0}
+#stage.m .a2hs::before{content:"";position:absolute;inset:0;z-index:-1;transform:skewX(-10deg);border-radius:3px;background:linear-gradient(90deg,#20242b,#191c22);box-shadow:inset 0 -3px 0 var(--acc),0 8px 18px rgba(0,0,0,.45)}
+#stage.m .a2hs svg{width:34px;height:34px;padding:6px;border-radius:2px;transform:skewX(-10deg);background:var(--acc);stroke:#140a04;stroke-width:2.2}
+#stage.m .a2hs span{font-size:20px;letter-spacing:.04em}
+#stage.m .a2hs small{font:800 11px 'Barlow Condensed';letter-spacing:.14em;text-transform:uppercase;color:var(--acc-hi);margin-top:2px}
+#stage.m .a2hs::after{content:"";margin-left:auto;width:9px;height:9px;border-top:2.5px solid rgba(255,255,255,.5);border-right:2.5px solid rgba(255,255,255,.5);transform:rotate(45deg)}
+#stage.m .a2hs:active::before{background:#262b33}
+#stage.m .a2step .a2share{flex:none;display:flex;flex-direction:column;align-items:center;gap:1px;width:56px;height:52px;justify-content:center;border:0;border-radius:3px;background:var(--acc);color:#140a04;box-shadow:0 6px 16px -4px rgba(255,106,31,.8)}
+#stage.m .a2step .a2share svg{width:24px;height:24px;stroke:#140a04;stroke-width:2.2}
+#stage.m .a2step .a2share small{font:800 10px 'Barlow Condensed';letter-spacing:.12em;text-transform:uppercase}
+#stage.m .a2step .a2share:active{transform:scale(.95)}
+/* the home-screen button's small line reads in light grey, clear of the orange underline (Zack, 2026-11-25: "its clashing with the orange") */
+#stage.m .a2hs{height:58px}
+#stage.m .a2hs span{padding-bottom:4px}
+#stage.m .a2hs small{color:rgba(255,255,255,.62);letter-spacing:.1em;margin-top:3px}
+#stage.m .a2step svg.ii{display:inline-block;width:17px;height:17px;vertical-align:-3px;margin:0 2px;fill:none;stroke:#fff;stroke-width:2.2;stroke-linecap:round}
+
+/* upright phones: while a chain is open, its strip takes the prompt's spot above the board (or on the center line on short phones), so it
+   never covers the computer's hand (Zack, 2026-11-25: "when a card is resolving, the noti fully covers the opponents hand"); the prompt
+   waits until the chain resolves, and your options are the buttons above your hand */
+#stage.m:not(.ml) .chainp{top:var(--py,var(--midy,380px));translate:0 -50%;padding:5px 8px}
+#stage.m:not(.ml) #s-duel.chaining .prompt{visibility:hidden}
+
+/* your card's buttons on phones: every label shown in full (Zack, 2026-11-25: "the text on the action bars needs to be fully legible...
+   right now the font is big and gets cut off"): a smaller face, wrapping to a second line when needed, two buttons a row when there are
+   more than two, Read kept narrow */
+#stage.m .amenu.mrow .gb,#stage.m .dial-menu.mrow .gb,#stage.m .amenu.respond .gb{height:auto;min-height:48px;padding:6px 10px;gap:6px;font-size:15px;line-height:1.05;letter-spacing:.02em;white-space:normal;text-align:center;flex:1 1 40%}
+#stage.m .amenu.mrow .gb .lbl,#stage.m .amenu.respond .gb .lbl{overflow:visible;text-overflow:clip;white-space:normal}
+#stage.m .amenu.mrow .gb svg,#stage.m .dial-menu.mrow .gb svg,#stage.m .amenu.respond .gb svg{width:17px;height:17px}
+#stage.m .amenu.mrow .gb.rd{flex:0 0 64px;padding:6px 4px}
+#stage.m .amenu.mrow:has(.gb:nth-child(3):not(.rd)) .gb:not(.rd){flex-basis:44%}
+#stage.m .amenu.mrow .gb:not(.rd),#stage.m .dial-menu.mrow .gb,#stage.m .amenu.respond .gb{flex:1 1 0;min-width:0}
+#stage.m .amenu.mrow:has(.gb:nth-child(4):not(.rd)) .gb:not(.rd),#stage.m .amenu.respond:has(.gb:nth-of-type(4)) .gb{flex:1 1 40%}
+#stage.m .coinwrap,#stage.m .coin,#stage.m .coin.heads,#stage.m .coin.tails{width:150px;height:150px}#stage.m .coin .cf i{width:112px;height:112px}#stage.m .coin .cb img{width:88px;height:88px}
+#stage.m #s-load .coin{width:150px;height:150px}
+/* phones: bigger computer hand; the banished cards are a tab of the Graveyard view now, so the bar buttons go */
+#stage.m .ohand .card{width:40px;height:58px}
+#stage.m .ohand{height:64px}
+#stage.m .banb{display:none!important}
+#stage.m .gyv .gytabs button{flex:1;height:42px;font-size:17px;padding:0 10px}
+#stage.m .flyc{border-radius:4px}
+
+/* ---------- slimmer bars (Zack, 2026-11-25: "make the player/opponents name/lp banner smaller/less tall, can remove the colored rectangles
+   under the lp... use the xtra space to make everything else sit comfortably") ----------
+   Each bar is one 44-point line: avatar, name, Life Points. The space they gave back moves the computer's hand off its Spell/Trap row
+   and gives your hand and the row above it room to breathe. */
+#stage.m:not(.ml) .lp{height:44px;gap:9px;padding:0 12px 0 8px}
+#stage.m:not(.ml) .lp.op{top:calc(var(--sat) + 2px)}
+#stage.m:not(.ml) .lp.me{bottom:calc(var(--sab) + 4px);padding-right:62px}
+#stage.m:not(.ml) .lp .em{width:30px;height:30px}
+#stage.m:not(.ml) .lp>div:nth-child(2){flex-direction:row;align-items:center;gap:8px}
+#stage.m:not(.ml) .lp .who{flex:1;min-width:0;padding-right:0;font-size:11px}
+#stage.m:not(.ml) .lp .num{margin:0;font-size:30px;line-height:1}
+#stage.m:not(.ml) .lp .bar{display:none}
+#stage.m:not(.ml) .ohand{top:calc(var(--sat) + 44px)}
+#stage.m:not(.ml) #tMenu{bottom:calc(var(--sab) + 9px);height:34px;width:42px}
+#stage.m:not(.ml){--row:calc(var(--sab) + 236px)}
+#stage.m:not(.ml) .hand{bottom:calc(var(--sab) + 56px)}
+
+/* choosing cards from your hand (a discard, Delinquent Duo...): the bar above your hand stays solid and readable while Confirm waits */
+#stage.m .amenu.respond .gb[disabled]{opacity:1;pointer-events:none}
+#stage.m .amenu.respond .gb[disabled]::before{background:#1d2127!important;box-shadow:inset 0 -3px 0 rgba(255,255,255,.08),0 8px 18px rgba(0,0,0,.45)!important}
+#stage.m .amenu.respond .gb[disabled],#stage.m .amenu.respond .gb[disabled] .cl{color:#8c939c}
+/* the computer's bar gets a blue outline like yours has orange, and its hand lies over the bar's lower edge (Zack, 2026-11-25) */
+#stage.m:not(.ml) .lp.op::before{box-shadow:inset 0 0 0 2px var(--opp),0 8px 20px rgba(0,0,0,.55)}
+#stage.m:not(.ml) .ohand{z-index:12;top:calc(var(--sat) + 30px)}

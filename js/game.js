@@ -1,26 +1,95 @@
 /* Learn Retro Play: the game. Screens, the deck picker, and the duel: engine events (from js/worker.js) become animations on
  the 3D table (js/table.js) and the HUD; your choices go back to the engine. The engine decides every rule; this file only
  shows the duel and passes on what you pick. */
-import { Table } from './table.js?v=33';
-import * as S from './sfx.js?v=33';
+import { Table } from './table.js?v=67';
+import * as S from './sfx.js?v=67';
 
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const LEAVES = '.dlg,.veil,.msheet,.dlist,.czoom,.hintp,.logp,.amenu,.dial-menu,.toast,.mydecks';
+{ const rm = Element.prototype.remove;
+  Element.prototype.remove = function () {
+    if (!REDUCED && this.isConnected && !this.dataset.leaving && this.matches && this.matches(LEAVES)) {
+      this.dataset.leaving = '1'; this.removeAttribute('id'); this.classList.add('out'); setTimeout(() => rm.call(this), 170); return; }
+    return rm.call(this); }; }
 const stage = $('#stage');
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const sleep = ms => new Promise(r => setTimeout(r, document.hidden ? 0 : ms));
 let scale = 1;
-function fit() { scale = Math.min(innerWidth / 1920, innerHeight / 1080); stage.style.transform = `translate(-50%,-50%) scale(${scale})`; }
+// touch screens and phones (Zack, 2026-11-24: "Touch + landscape"): .touch drops hover and key prompts, .phone (a touch screen
+// where the stage shrinks below 0.6) scales the duel HUD and card text up from their corners (css/game.css)
+const TAP = () => TOUCH ? 'tap' : 'click'; // on-screen words follow the device
+const TOUCH = /[?&](touch|mobile|phone)\b/.test(location.search) || matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0 && !matchMedia('(pointer: fine)').matches;
+/* the phone layout (Zack, 2026-11-24: "a specific mobile version/layout... doesnt need to be in landscape... could not affect the web
+   experience"): phones get an upright stage 390 points wide and as tall as the screen (#stage.m, css/mobile.css), the upright Card Shop
+   render and its camera, and phone screens built from the same game. Computers and tablets keep the 1920x1080 stage. ?mobile tries it. */
+const FORCE_M = /[?&]mobile\b/.test(location.search);
+const PHONE = FORCE_M || /[?&]phone\b/.test(location.search) || (TOUCH && Math.min(screen.width, screen.height) < 520);
+// phones always get the phone UI: upright (#stage.m) or, held sideways, its landscape version (#stage.m.ml; Zack, 2026-11-25: "the landscape
+// version on mobile is literally just the web ui. it needs to match the mobile ui but be formatted for landscape")
+const uprightNow = () => FORCE_M || innerHeight >= innerWidth;
+const MOBILE = PHONE;
+// sideways phones were tried and set aside (Zack, 2026-11-25: "the landscape view looks super janky right now, lets just stick to upright"):
+// LAND stays false and a phone held sideways sees "Turn your phone upright" (#rotate); the #stage.ml styles remain for a later try
+let LAND = false;
+let LG = { cx: 195 };     // landscape: the board's middle, for the hands
+let SW = 1920, SH = 1080;
+const MV = { w: 390, h: 845 };            // the upright render (1080x2340) drawn at the phone's width
+// the board on phones (Zack, 2026-11-24: "a bit too much dead space between my hand and the board, lets make the board a bit bigger"):
+// as wide as the phone allows (up to 106% of the render) and sitting just above the row (turn, Hint, phase) over your hand.
+// In the render at full size the board with its rim spans y 215 to 510. The prompt and chain strip sit above it when there is room;
+// on short phones (an SE) the board shrinks to fit under the computer's hand instead.
+const sabPx = () => { const pr = $('#sabProbe'); return pr ? pr.offsetHeight : 10; };
+// landscape phones: the landscape render (its board spans x 12.5-87.5% at the near edge and y 22.4-92.8%) between a left column (bars,
+// prompt, chain) and a right column (turn, phase, Hint, your card's buttons), its near edge just above your hand
+const LCOL = 188, RCOL = 128;
+function lview() {
+  const cw = SW - LCOL - RCOL; let w = cw / 0.75, h = w * 9 / 16; const maxH = (SH - 52 - 56) / 0.704; if (h > maxH) { h = maxH; w = h * 16 / 9; }
+  const cx = LCOL + cw / 2; LG = { cx };
+  return { w: Math.round(w), h: Math.round(h), ox: Math.round(cx - w / 2), oy: Math.round(SH - 52 - 0.928 * h), dpr: Math.min(3, (window.devicePixelRatio || 1) * scale) }; }
+function mview() {
+  if (LAND) return lview();
+  const rowTop = SH - sabPx() - ROW_B - 48, bottom = rowTop - 10;
+  let k = Math.min(1.12, (bottom - 205) / 262); if (k < 0.9) k = Math.min(1.12, (bottom - 112) / 262);
+  const w = Math.round(MV.w * k), h = Math.round(MV.h * k);
+  return { w, h, ox: Math.round((MV.w - w) / 2), oy: Math.round(bottom - 499 * k), dpr: Math.min(3, (window.devicePixelRatio || 1) * scale) }; }
+const ROW_B = 236, HW = 96;   // the row's distance above the safe bottom edge, and a hand card's width (css/mobile.css --row, .hc)
+function switchLayout() {
+  stage.classList.toggle('m', MOBILE); stage.classList.toggle('ml', LAND); document.documentElement.classList.toggle('m', MOBILE);
+  try {
+    closeSheet(); if (typeof closeCardZoom === 'function') closeCardZoom();
+    if (table) rebuildTable();
+    if (cur === 'build' && B.deck) renderBuilder(); if (cur === 'deck') renderDecks();
+  } catch (e) { /* first call, before the game is set up */ }
+}
+function placeMid() { try { if (!table) return; const p = table.project(new (table.camera.position.constructor)(0, 0, 0)); stage.style.setProperty('--midy', Math.round(p.y) + 'px'); } catch (e) { /* no table yet */ } }
+function fit() {
+  if (PHONE) { document.documentElement.classList.toggle('sideways', !uprightNow()); document.documentElement.classList.add('m'); if (!uprightNow()) return; }   // sideways: nothing to lay out until it turns back
+  if (!MOBILE) { stage.style.width = stage.style.height = ''; }
+  if (MOBILE) { if (LAND) { scale = innerHeight / 390; SH = 390; SW = Math.round(innerWidth / scale); } else { scale = innerWidth / 390; SW = 390; SH = Math.round(innerHeight / scale); }
+    stage.style.width = SW + 'px'; stage.style.height = SH + 'px'; stage.style.setProperty('--sw', SW + 'px');
+    const v = mview(); for (const k of ['w', 'h', 'ox', 'oy']) stage.style.setProperty('--g' + k, v[k] + 'px');
+    // the prompt strip: in the open band between the computer's hand and the board when there is one, else on the center line
+    stage.style.setProperty('--cx', LG.cx + 'px');
+    const top = v.oy + 237 * v.h / MV.h; if (!LAND && top - 112 >= 52) stage.style.setProperty('--py', Math.round(top - 26) + 'px'); else stage.style.removeProperty('--py'); stage.classList.toggle('mline', !LAND && top - 112 < 52); try { if (table) { table.setView(v); placeMid(); } } catch (e) { /* the table isn't made yet */ } }
+  else scale = Math.min(innerWidth / 1920, innerHeight / 1080);
+  stage.style.transform = `translate(-50%,-50%) scale(${scale})`;
+  stage.classList.toggle('m', MOBILE); stage.classList.toggle('ml', LAND); document.documentElement.classList.toggle('m', MOBILE);
+  stage.classList.toggle('touch', TOUCH); stage.classList.toggle('phone', !MOBILE && TOUCH && scale < 0.6); }
 addEventListener('resize', fit); fit();
 const toStage = e => { const r = stage.getBoundingClientRect(); return { x: (e.clientX - r.left) / scale, y: (e.clientY - r.top) / scale }; };
 
 /* ---------- settings ---------- */
-const SET = Object.assign({ vol: 50, speed: 'normal', hintLimit: '3', muted: false, theme: 'broadcast' }, JSON.parse(localStorage.getItem('lrplay:set') || '{}'));
+const SET = Object.assign({ vol: 50, speed: 'relaxed', hintLimit: '3', muted: false, theme: 'broadcast' }, JSON.parse(localStorage.getItem('lrplay:set') || '{}'));
 const saveSet = () => localStorage.setItem('lrplay:set', JSON.stringify(SET));
-const SPEED = { relaxed: 1.35, normal: 1, fast: 0.55, instant: 0.04 };
+const SPEED = { relaxed: 1.15, normal: 1.05, fast: 0.55, instant: 0.04 };   // a touch slower card moves (Zack, 2026-11-25: "slow down the card action animations just slightly")
+const GAP = { relaxed: 1.6, normal: 1, fast: 0.55, instant: 0.04 };
+const BEAT = { relaxed: 1100, normal: 450, fast: 160, instant: 0 };   // ms after each computer play
+if (SET.paceV !== 2) { SET.speed = 'relaxed'; SET.paceV = 2; localStorage.setItem('lrplay:set', JSON.stringify(SET)); }   // once: everyone starts on Relaxed
 S.setVolume(SET.vol / 100); S.setMuted(SET.muted); S.load();
 /* Settings: one row per setting, ↑↓ to choose a row, ←→ to change it (Rewind's layout, Broadcast style) */
 const SETROWS = [
-  { k: 'speed', name: 'Duel speed', vals: ['relaxed', 'normal', 'fast', 'instant'], lab: v => v, desc: 'How fast cards move and banners play during a duel.' },
+  { k: 'speed', name: 'Duel speed', vals: ['relaxed', 'normal', 'fast', 'instant'], lab: v => v, desc: 'How fast cards move, banners play and the computer takes its turn. Relaxed gives you time to follow every play.' },
   { k: 'hintLimit', name: 'Hints per duel', vals: ['off', '1', '3', '5', 'unlimited'], lab: v => v, desc: 'A hint shows the strongest play and why it beats the next best, like the hint button on a chess site.' },
   { k: 'vol', name: 'Sound effects', vals: [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100], blocks: true, desc: 'How loud cards, summons and battles are.' },
   { k: 'muted', name: 'Sound', vals: [false, true], lab: v => v ? 'off' : 'on', desc: 'Turn every sound on or off.' },
@@ -36,7 +105,7 @@ applyTheme();
 function renderSettings() {
   $('#setList').innerHTML = SETROWS.map((r, i) => { const v = SET[r.k] != null ? SET[r.k] : r.vals[0];
     const val = r.blocks ? `<span class="blocks">${r.vals.slice(1).map(x => `<i class="${x <= v ? 'f' : ''}"></i>`).join('')}</span><span class="vn">${v}</span>` : `<span class="vt">${r.lab(v)}</span>`;
-    return `<div class="vrow ${i === setRow ? 'on' : ''}" data-i="${i}"><span>${r.name}</span><span class="dots"></span><span class="val"><span class="arr" data-d="-1">◀</span>${val}<span class="arr" data-d="1">▶</span>${r.soon ? `<span class="soonv">${r.soon}</span>` : ''}</span></div>`; }).join('');
+    return `<div class="vrow ${i === setRow ? 'on' : ''}" data-i="${i}"><span>${r.name}</span><span class="dots"></span><span class="val"><span class="arr" data-d="-1"><svg><use href="#i-tl"/></svg></span>${val}<span class="arr" data-d="1"><svg><use href="#i-tr"/></svg></span>${r.soon ? `<span class="soonv">${r.soon}</span>` : ''}</span></div>`; }).join('');
   $('#setDesc').textContent = SETROWS[setRow].desc;
 }
 function changeSetting(i, d) {
@@ -57,7 +126,7 @@ const rec = (f, id) => id == null ? null : (CARD[f].get(String(id)) || TOK[id] |
 const artUrl = id => id == null ? 'img/back.webp' : typeof id === 'string' && TOKEN_ART[id] ? `img/${TOKEN_ART[id][0]}.webp` : `img/${id}.webp`;
 
 /* ---------- the duel host ---------- */
-const W = new Worker('js/worker.js?v=33');
+const W = new Worker('js/worker.js?v=67');
 let READY = null; const readyP = new Promise(r => { W.addEventListener('message', function h(e) { if (e.data.type === 'ready') { READY = e.data.formats; W.removeEventListener('message', h); r(); } }); });
 W.postMessage({ type: 'init' });
 W.onmessage = e => { const m = e.data; if (m.type === 'update') duelUpdate(m); else if (m.type === 'hint') showHint(m); else if (m.type === 'summary') { if (D) { D.summary = m.summary; if (D.over) { recordMatch(D.over, m.summary); renderReview(m.summary); } } } else if (m.type === 'reviewing') { const el = $('#resReview p.mute'); if (el) el.textContent = `Reviewing your duel… ${m.left} decisions left`; } else if (m.type === 'error') { console.error(m.message, m.stack); toast('Something went wrong in the engine: ' + m.message, 6000); } };
@@ -70,7 +139,8 @@ window.__lr = { get D() { return D; }, get SEL() { return SEL; }, start: () => s
 const BACK = { settings: 'title', format: 'title', deck: 'format', stats: 'title', build: 'title' };
 async function goBack() { if (cur === 'build' && B.dirty && !(await ask('Leave without saving?', 'Leave'))) return; if (BACK[cur]) show(BACK[cur]); }
 $('#gBack').onclick = () => { S.unlock(); goBack(); };
-function show(s) { if (s !== cur) S.play('nav'); if (s !== cur) closeDeckList(); if (s !== 'build') closeCardZoom(); cur = s; stage.dataset.scr = s; $('#gBack').classList.toggle('on', !!BACK[s]); $$('.screen').forEach(e => e.classList.toggle('on', e.id === 's-' + s)); if (s === 'deck') renderDecks(); if (s === 'format') renderFormats(); if (s === 'build') { B.howto = undefined; readyP.then(openBuilder); } /* OK hides the how-to only until the next visit */ if (s === 'stats') renderStats(); if (s === 'settings') renderSettings(); if (s === 'title') updateTicker(); }
+$('#mTabs').onclick = async e => { const b = e.target.closest('[data-tab]'); if (!b || b.dataset.tab === cur) return; S.unlock(); if (cur === 'build' && B.dirty && !(await ask('Leave without saving?', 'Leave'))) return; show(b.dataset.tab); };
+function show(s) { const prevScr = cur; if (s !== cur) S.play('nav'); if (s !== cur) closeDeckList(); if (s !== 'build') closeCardZoom(); cur = s; stage.dataset.scr = s; $$('#mTabs [data-tab]').forEach(b => b.classList.toggle('on', b.dataset.tab === s)); closeSheet(); $('#gBack').classList.toggle('on', !!BACK[s]); $$('.screen').forEach(e => { const on = e.id === 's-' + s; if (!on && e.classList.contains('on') && !REDUCED) { e.classList.add('leaving'); setTimeout(() => e.classList.remove('leaving'), 260); } e.classList.toggle('on', on); }); if (s === 'deck') { if (prevScr !== 'deck') { PK = { you: false, cpu: false }; pickingOpp = false; SEL.mtab = 'you'; } renderDecks(); } if (s === 'format') renderFormats(); if (s === 'build') { B.howto = undefined; readyP.then(openBuilder); } /* OK hides the how-to only until the next visit */ if (s === 'stats') renderStats(); if (s === 'settings') renderSettings(); if (s === 'title') updateTicker(); }
 // browsers keep a page silent until the first click, tap or key press (hovering doesn't count): turn sound on at the very first one, anywhere
 for (const ev of ['pointerdown', 'keydown', 'touchstart']) addEventListener(ev, () => S.unlock(), { capture: true, passive: true });
 document.addEventListener('click', e => { const b = e.target.closest('[data-go]'); if (b) { S.unlock(); show(b.dataset.go); } const h = e.target.closest('[data-href]'); if (h) open(h.dataset.href, '_blank'); });
@@ -118,7 +188,7 @@ function chooseFmt(f) { if (!readyDecks(f).length) { toast('No deck in this form
 $$('.fmt').forEach(x => { x.onclick = () => { S.unlock(); chooseFmt(x.dataset.fmt); }; x.onmouseenter = () => focusFmt(x.dataset.fmt); x.onmouseleave = () => focusFmt(null); });
 const TIERS = { edison: ['Best', 'Competitive', 'Rogue', 'Contender', 'Casual'], goat: ['A', 'B', 'C', 'D', 'T'] };
 const TIERNAME = { A: 'Tier A', B: 'Tier B', C: 'Tier C', D: 'Tier D', T: 'Tournament' };
-let pickingOpp = false;
+let pickingOpp = false, PK = { you: false, cpu: false };
 function keyCards(f, d) { // three cards to show for a deck: its strongest monsters, Extra Deck first
   const ids = [...new Set([...d.extra, ...d.main])]; const rs = ids.map(id => rec(f, id)).filter(r => r && !['spell', 'trap'].includes(r.k));
   rs.sort((a, b) => (+b.atk || 0) - (+a.atk || 0)); const out = rs.slice(0, 3).map(r => r.id); while (out.length < 3 && ids[out.length]) out.push(ids[out.length]); return out;
@@ -128,6 +198,7 @@ async function renderDecks() {
   const f = SEL.fmt, decks = allDecks(f), info = new Map(decks.map(d => [d.key, deckInfo(f, d)]));
   const ok = decks.filter(d => info.get(d.key).ready).map(d => d.key); const s = SEL[f];
   if (!ok.includes(s.you)) s.you = ok.find(k => !k.startsWith('my:')) || ok[0]; if (!ok.includes(s.cpu)) s.cpu = ok.filter(k => !k.startsWith('my:'))[1] || ok[0];
+  if (MOBILE) pickingOpp = SEL.mtab === 'opp';
   $('#deckTitle').textContent = pickingOpp ? "Computer's deck" : 'Your deck';
   const tabs = ['all', 'my', ...TIERS[f]];
   $('#tierTabs').innerHTML = tabs.map(t => `<button class="gb sm ${SEL.tier === t ? 'on' : ''}" data-tier="${t}">${t === 'all' ? 'All' : t === 'my' ? 'My decks' : (TIERNAME[t] || t)}<span class="shine"></span></button>`).join('');
@@ -137,29 +208,46 @@ async function renderDecks() {
   const sel = pickingOpp ? s.cpu : s.you;
   const why = r => r.problems && r.problems.length ? ' · not legal yet' : r.missing.length ? ` · ${r.missing.length} card${r.missing.length > 1 ? 's' : ''} not playable yet` : '';
   $('#deckList').innerHTML = (list.length ? list : []).map(d => { const r = info.get(d.key); const k = keyCards(f, d)[0];
-    return `<div class="dk ${d.key === sel ? 'sel' : ''} ${pickingOpp ? 'opp' : ''} ${r.ready ? '' : 'off'}" data-deck="${esc(d.key)}"><div class="strip" style="background-image:url(${artUrl(k)})"></div><div><div class="nm cap">${esc(d.name)}</div><div class="pl">${d.main.length} cards${d.extra.length ? ` · ${d.extra.length} in the ${f === 'goat' ? 'Fusion' : 'Extra'} Deck` : ''}${why(r)}</div></div><div class="tags"><span class="tg ${d.tier === 'my' || d.tier === TIERS[f][0] ? 'hot' : ''}">${d.tier === 'my' ? 'Yours' : esc(TIERNAME[d.tier] || d.tier)}</span>${r.ready ? '' : `<span class="tg">${r.problems && r.problems.length ? 'Fix' : 'Soon'}</span>`}</div></div>`; }).join('')
+    return `<div class="dk ${d.key === sel && PK[pickingOpp ? 'cpu' : 'you'] ? 'sel' : ''} ${pickingOpp ? 'opp' : ''} ${r.ready ? '' : 'off'}" data-deck="${esc(d.key)}"><div class="strip" style="background-image:url(${artUrl(k)})"></div><div><div class="nm cap">${esc(d.name)}</div><div class="pl">${d.main.length} cards${d.extra.length ? ` · ${d.extra.length} in the ${f === 'goat' ? 'Fusion' : 'Extra'} Deck` : ''}${why(r)}</div></div><div class="tags"><span class="tg ${d.tier === 'my' || d.tier === TIERS[f][0] ? 'hot' : ''}">${d.tier === 'my' ? 'Yours' : esc(TIERNAME[d.tier] || d.tier)}</span>${r.ready ? '' : `<span class="tg">${r.problems && r.problems.length ? 'Fix' : 'Soon'}</span>`}</div></div>`; }).join('')
     || (SEL.tier === 'my' ? '<div class="mute" style="font-size:20px;padding:20px">No decks of your own yet. Build one in the Deck Builder.</div>' : '');
   $('#deckList').onclick = e => { const el = e.target.closest('[data-deck]'); if (!el) return; const r = info.get(el.dataset.deck);
     if (el.classList.contains('off')) { S.play('error'); toast(r.problems && r.problems.length ? r.problems[0] : 'This deck has cards the engine can\'t play yet: ' + r.missing.slice(0, 4).join(', ') + (r.missing.length > 4 ? '…' : '')); return; }
-    if (pickingOpp) { s.cpu = el.dataset.deck; pickingOpp = false; } else s.you = el.dataset.deck; saveSel(); S.play('click'); renderDecks(); };
+    if (pickingOpp) { s.cpu = el.dataset.deck; PK.cpu = true; if (!MOBILE) pickingOpp = false; }
+    else { s.you = el.dataset.deck; PK.you = true; if (!PK.cpu) { if (MOBILE) SEL.mtab = 'opp'; else pickingOpp = true; } }
+    saveSel(); S.play('click'); renderDecks(); if (pickingOpp) $('#deckList').scrollTop = 0; };
   const you = deckByKey(f, s.you), cpu = deckByKey(f, s.cpu);
   if (!you || !cpu) { $('#deckSide').innerHTML = ''; return; }
   const kc = keyCards(f, you);
   $('#deckSide').innerHTML = `<div class="dk-fan">${kc.map((id, i) => `<div class="card" style="background-image:url(${artUrl(id)});left:${170 + i * 150}px;${i === 1 ? 'top:-4px;z-index:2;box-shadow:0 20px 50px rgba(0,0,0,.8)' : `transform:rotate(${i ? 10 : -10}deg)`}"></div>`).join('')}</div>
     <div class="ph">Your deck · ${you.tier === 'my' ? 'Yours' : esc(TIERNAME[you.tier] || you.tier)} · ${f === 'goat' ? 'Goat' : 'Edison'}</div><h3 class="disp">${esc(you.name)}</h3>
     <p>${you.main.length} cards in the Main Deck${you.extra.length ? `, ${you.extra.length} in the ${f === 'goat' ? 'Fusion' : 'Extra'} Deck` : ''}.${you.credit ? ' List: ' + esc(you.credit) + '.' : ''}</p>
-    <div class="row"><button class="gb sm pri" id="seeList"><svg><use href="#i-list"/></svg>See the full deck list<span class="key">L</span><span class="shine"></span></button><button class="gb sm" id="seeOpp"><svg><use href="#i-list"/></svg>Computer's list<span class="shine"></span></button></div>
-    <div class="row"><span class="lb cap">Opponent</span><div style="display:flex;align-items:center;gap:12px;font-size:22px"><div class="card" style="width:50px;height:73px;background-image:url(${artUrl(keyCards(f, cpu)[0])})"></div><b class="cap">${esc(cpu.name)}</b></div>
-      <button class="gb sm" id="oppPick" style="margin-left:auto"><svg><use href="#i-cards"/></svg>${pickingOpp ? 'Picking…' : 'Change'}<span class="shine"></span></button><button class="gb sm" id="oppRand">Random<span class="shine"></span></button></div>
+    <div class="row"><button class="gb sm pri" id="seeList"><svg><use href="#i-list"/></svg>See the full deck list<span class="key">L</span><span class="shine"></span></button><button class="gb sm" id="seeOpp" ${PK.cpu ? '' : 'disabled'}><svg><use href="#i-list"/></svg>Computer's list<span class="shine"></span></button></div>
+    <div class="row"><span class="lb cap">Opponent</span><div style="display:flex;align-items:center;gap:12px;font-size:22px">${PK.cpu ? `<div class="card" style="width:50px;height:73px;background-image:url(${artUrl(keyCards(f, cpu)[0])})"></div><b class="cap">${esc(cpu.name)}</b>` : `<span class="mute">${pickingOpp ? 'Pick it from the list' : 'Not chosen yet'}</span>`}</div>
+      <button class="gb sm" id="oppPick" style="margin-left:auto"><svg><use href="#i-cards"/></svg>${pickingOpp ? 'Picking…' : PK.cpu ? 'Change' : 'Choose'}<span class="shine"></span></button><button class="gb sm" id="oppRand">Random<span class="shine"></span></button></div>
     <div class="row" style="align-items:flex-start"><span class="lb cap" style="margin-top:14px">Computer</span><div><div class="seg" id="lvl">${LEVELS.map(([k, n]) => `<button class="gb sm ${SEL.level === k ? 'pri' : ''}" data-l="${k}">${n}<span class="shine"></span></button>`).join('')}</div>
       <div class="mute" style="font-size:16px;margin-top:10px;max-width:600px">${esc(LEVELS.find(l => l[0] === SEL.level)[2])}</div></div></div>`;
+  if (!PK.you) $('#deckSide').insertAdjacentHTML('beforeend', `<div class="dk-pick"><div class="ph">Step 1 of 2</div><h3 class="disp">Choose your deck</h3><p>Pick a deck from the list on the left. Then pick the computer's deck, and the computer's level.</p></div>`);
+  const ready = PK.you && PK.cpu; $('#duelGo').classList.toggle('off', !ready);
+  if (MOBILE) {
+    const thumb = d => `<i style="background-image:url(${artUrl(keyCards(f, d)[0])})"></i>`;
+    const tb = (seat, d, label) => PK[seat] ? `${thumb(d)}<span><small>${label}</small>${esc(d.name)}</span>` : `<i class="empty"></i><span><small>${label}</small>Choose</span>`;
+    $('#mdTabs').innerHTML = `<button class="${pickingOpp ? '' : 'on'}" data-mt="you">${tb('you', you, 'Your deck')}</button><button class="${pickingOpp ? 'on op' : ''}" data-mt="opp">${tb('cpu', cpu, 'Opponent')}</button>`;
+    $('#mdTabs').onclick = e => { const b = e.target.closest('[data-mt]'); if (!b) return; SEL.mtab = b.dataset.mt; S.play('click'); renderDecks(); $('#deckList').scrollTop = 0; };
+    const cur2 = pickingOpp ? cpu : you;
+    const chosen = PK[pickingOpp ? 'cpu' : 'you'];
+    $('#mdTools').innerHTML = `<button class="gb sm" id="mdList" ${chosen ? '' : 'disabled'}><svg><use href="#i-list"/></svg>See ${pickingOpp ? "the computer's" : 'your'} deck list<span class="shine"></span></button>${pickingOpp ? `<button class="gb sm" id="mdRand">Random<span class="shine"></span></button>` : ''}`;
+    $('#mdList').onclick = () => deckList(f, cur2, pickingOpp ? "The computer's deck" : 'Your deck');
+    if ($('#mdRand')) $('#mdRand').onclick = () => $('#oppRand').click();
+    $('#mdFoot').innerHTML = `<div class="lvls">${LEVELS.map(([k, n]) => `<button class="${SEL.level === k ? 'on' : ''}" data-l="${k}">${n}</button>`).join('')}</div>`;
+    $('#mdFoot').onclick = e => { const b = e.target.closest('[data-l]'); if (b) { SEL.level = b.dataset.l; saveSel(); S.play('click'); renderDecks(); } };
+  }
   $('#seeList').onclick = () => deckList(f, you, 'Your deck');
   $('#seeOpp').onclick = () => deckList(f, cpu, "The computer's deck");
   $('#oppPick').onclick = () => { pickingOpp = !pickingOpp; S.play('click'); renderDecks(); };
-  $('#oppRand').onclick = () => { const o = ok.filter(n => n !== s.you); s.cpu = o[Math.floor(Math.random() * o.length)] || s.you; pickingOpp = false; saveSel(); S.play('shuffle'); renderDecks(); };
+  $('#oppRand').onclick = () => { const o = ok.filter(n => n !== s.you); s.cpu = o[Math.floor(Math.random() * o.length)] || s.you; pickingOpp = false; PK.cpu = true; if (MOBILE) SEL.mtab = 'opp'; saveSel(); S.play('shuffle'); renderDecks(); };
   $('#lvl').onclick = e => { const b = e.target.closest('[data-l]'); if (b) { SEL.level = b.dataset.l; saveSel(); S.play('click'); renderDecks(); } };
 }
-$('#duelGo').onclick = () => { S.unlock(); startDuel(); };
+$('#duelGo').onclick = () => { S.unlock(); if (!(PK.you && PK.cpu)) { S.play('error'); toast(!PK.you ? 'Choose your deck first.' : "Choose the computer's deck first."); return; } startDuel(); };
 // the whole list of a deck: Main Deck by card type, then the Extra (Fusion) Deck, with counts; hover a card to read it
 function deckList(f, d, title) {
   closeDeckList(); S.play('click');
@@ -190,6 +278,7 @@ const cardText = (f, r) => f === 'edison' && r.ps && !/^No rulings/.test(r.ps) ?
 /* ---------- a pile on the table: every card in a Graveyard, the banished cards, your Extra Deck ---------- */
 function pileView(pi, kind) {
   if (!D || !D.view) return;
+  if (kind === 'gy' || kind === 'ban') return gyView(pi, kind);
   const P = D.view.p[pi], who = pi === 0 ? 'Your' : "The computer's";
   if (kind === 'deck') { toast(`${who} Deck: ${P.deck} cards.`); return; }
   if (kind === 'extra' && pi === 1) { toast(`The computer's ${D.fmt === 'goat' ? 'Fusion' : 'Extra'} Deck: ${P.extra.length} cards, face-down.`); return; }
@@ -205,6 +294,25 @@ function pileView(pi, kind) {
   $('#layer').append(v, p);
   v.onclick = closeDeckList; p.querySelector('#dlClose').onclick = closeDeckList;
   p.onmouseover = e => peekOver(e, p, D.fmt);
+}
+function gyView(pi, kind) {
+  const P = D.view.p[pi], who = pi === 0 ? 'Your' : "The computer's";
+  if (!P.gy.length && !P.ban.length) { toast(`${who} Graveyard is empty.`); return; }
+  if (!P[kind].length) kind = kind === 'gy' ? 'ban' : 'gy';
+  closeDeckList(); S.play('click');
+  const v = document.createElement('div'); v.className = 'veil'; v.id = 'dlVeil'; v.style.zIndex = 59;
+  const p = document.createElement('div'); p.className = 'pn dlist gyv'; p.id = 'dlist';
+  const draw = () => {
+    const list = [...P[kind]].reverse();
+    p.innerHTML = `<div class="head"><h3 class="disp">${who} cards</h3><button class="gb sm" id="dlClose"><svg><use href="#i-x"/></svg>Close<span class="key">Esc</span><span class="shine"></span></button></div>
+      <div class="gytabs"><button class="${kind === 'gy' ? 'on' : ''}" data-k="gy">Graveyard <b>${P.gy.length}</b></button><button class="${kind === 'ban' ? 'on ban' : ''}" data-k="ban">Banished <b>${P.ban.length}</b></button></div>
+      <div class="body">${list.length ? `<div class="grid">${list.map(c => { const r = rec(D.fmt, c.id); return `<div class="dl" data-id="${c.id}"><div class="card" style="background-image:url(${artUrl(c.id)})"></div>${esc(r ? r.n : '')}</div>`; }).join('')}</div>` : `<div class="mute" style="padding:20px 4px">No ${kind === 'gy' ? 'cards in the Graveyard' : 'banished cards'}.</div>`}</div>
+      <div class="pn peek hidden" id="dlPeek"></div>`;
+    p.querySelector('#dlClose').onclick = closeDeckList;
+    p.querySelector('.gytabs').onclick = e => { const b = e.target.closest('[data-k]'); if (b && b.dataset.k !== kind) { kind = b.dataset.k; S.play('click'); draw(); } };
+    if (MOBILE) p.querySelector('.body').onclick = e => { const t = e.target.closest('[data-id]'); if (t) cardSheet(t.dataset.id); };
+  };
+  draw(); $('#layer').append(v, p); v.onclick = closeDeckList; p.onmouseover = e => peekOver(e, p, D.fmt);
 }
 function peekOver(e, p, f) {
   const t = e.target.closest('[data-id]'); if (!t) return; const r = rec(f, t.dataset.id); if (!r) return; const pk = p.querySelector('#dlPeek'); pk.classList.remove('hidden');
@@ -224,9 +332,9 @@ const LIMIT = r => r && r.b === 'F' ? 0 : r && r.b === 'L' ? 1 : r && r.b === 'S
 function howTo(f, xl) {
   const tip = (h, t) => `<div class="tip"><b>${h}</b><span>${t}</span></div>`;
   return `<div class="pn howto" id="howto"><h4 class="disp">Build your deck</h4>
-    ${tip('Click a card', 'to read it, then Add to deck.')}
-    ${tip('Drag a card', `here to add it. Drag one back to the cards on the left to remove it.`)}
-    ${tip('Right-click', 'adds a card from the left, or removes one from your deck, in one go.')}
+    ${tip(TOUCH ? 'Tap a card' : 'Click a card', 'to read it, then Add to deck.')}
+    ${MOBILE ? tip('Cards and Your deck', 'are tabs at the top. Tap a card in either to read it, then add or remove it.') : TOUCH ? tip('Hold a card and drag it', 'here to add it. Hold one in your deck and drag it back to the left to remove it.') : tip('Drag a card', `here to add it. Drag one back to the cards on the left to remove it.`)}
+    ${TOUCH ? '' : tip('Right-click', 'adds a card from the left, or removes one from your deck, in one go.')}
     ${tip('Search and filter', `by name or card text, or show only Monsters, Spells, Traps or ${xl} cards.`)}
     ${tip('Deck rules', `40 to 60 cards in the Main Deck, up to 15 in the ${xl} Deck, 3 copies at most. Cards marked F, L or S are Forbidden, Limited (1) or Semi-Limited (2) on the ${f === 'goat' ? 'Goat' : 'Edison'} banlist.`)}
     ${tip('Start from a deck', 'copies one of the prebuilt decks so you can change it.')}
@@ -270,6 +378,9 @@ function renderBuilder() {
   $('#bQ').oninput = e => { B.q = e.target.value; renderPool(); };
   $('#bType').onclick = e => { const b = e.target.closest('[data-t]'); if (!b) return; B.type = b.dataset.t; S.play('click'); renderBuilder(); };
   renderPool(); renderDeckSide();
+  if (MOBILE) { const t = $('#mbTabs'); t.innerHTML = `<button class="${B.mtab !== 'deck' ? 'on' : ''}" data-mt="pool">Cards</button><button class="${B.mtab === 'deck' ? 'on' : ''}" data-mt="deck">Your deck · <b id="mbN">${B.deck.main.length}</b></button>`;
+    $('#s-build').classList.toggle('deckview', B.mtab === 'deck'); stage.style.setProperty('--bt', ($('#bBoard').offsetHeight + 10) + 'px');
+    t.onclick = e => { const b = e.target.closest('[data-mt]'); if (!b) return; B.mtab = b.dataset.mt; S.play('click'); closeCardZoom(); t.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); $('#s-build').classList.toggle('deckview', B.mtab === 'deck'); }; }
 }
 function poolCards() {
   const f = B.fmt, q = B.q.trim().toLowerCase();
@@ -314,7 +425,7 @@ function fitCards(n, W, H, gap = 5, ratio = 614 / 421) {
 const typeOrder = (f, id) => { const r = rec(f, id); return !r ? 9 : isExtraK(r) ? 4 : r.k === 'spell' ? 2 : r.k === 'trap' ? 3 : 0; };
 const sortDeck = (f, ids) => [...ids].sort((a, b) => typeOrder(f, a) - typeOrder(f, b) || ((rec(f, a) || {}).n || '').localeCompare((rec(f, b) || {}).n || ''));
 function renderDeckSide() {
-  const f = B.fmt, d = B.deck, probs = deckProblems(f, d);
+  const f = B.fmt, d = B.deck, probs = deckProblems(f, d); if ($('#mbN')) $('#mbN').textContent = d.main.length;
   const nMon = d.main.filter(id => typeOrder(f, id) === 0).length, nSp = d.main.filter(id => typeOrder(f, id) === 2).length, nTr = d.main.filter(id => typeOrder(f, id) === 3).length;
   const okMain = d.main.length >= 40 && d.main.length <= 60;
   // the bottom bar's live count: Main and Extra/Fusion against their limits, and whether the deck is ready to duel
@@ -337,7 +448,7 @@ function renderDeckSide() {
   // (this visit) or "Don't show this again" (lrplay:howto); the ? beside Your deck opens it again
   const showHow = B.howto !== false && localStorage.getItem('lrplay:howto') !== 'off' || B.howto === true;
   $('#bDeck').innerHTML = `<div class="rhead"><div class="lbl">Your deck</div><button class="hq" id="htQ" title="How the Deck Builder works">?</button><div class="stat">${statLine}</div></div>
-    ${main.length ? `<div class="main" style="grid-template-columns:repeat(${fm.cols},${w}px)">${main.map(tile).join('')}</div>` : `<div class="dropme"><b>Drag cards here</b><span>or click a card on the left to read it and add it</span></div>`}
+    ${main.length ? `<div class="main" style="grid-template-columns:repeat(${fm.cols},${w}px)">${main.map(tile).join('')}</div>` : `<div class="dropme"><b>Drag cards here</b><span>or ${TAP()} a card on the left to read it and add it</span></div>`}
     ${showHow && (!main.length || B.howto === true) ? howTo(f, xl) : ''}
     <div class="extra" style="grid-template-columns:repeat(${fe.cols},${we}px)"><div class="xl">${xl} deck · ${extra.length}</div>${extra.map(tile).join('')}</div>`;
   $('#htQ').onclick = () => { B.howto = true; S.play('click'); renderDeckSide(); };
@@ -384,6 +495,79 @@ function closeCardZoom() { const z = $('#czoom'); if (z) { z.remove(); return tr
   pool.addEventListener('dragend', end); deck.addEventListener('dragend', end);
   deck.addEventListener('dragover', over(deck, 'pool')); deck.addEventListener('dragleave', leave(deck)); deck.addEventListener('drop', drop(deck, 'pool', addCard));
   pool.addEventListener('dragover', over(pool, 'deck')); pool.addEventListener('dragleave', leave(pool)); pool.addEventListener('drop', drop(pool, 'deck', removeCard));
+})();
+
+/* touch drag in the Deck Builder (Zack, 2026-11-24: touch): phones and tablets have no HTML drag and drop, so holding a card
+   for a moment picks it up (a quick swipe still scrolls the list), it follows your finger, and letting go over the other
+   pane adds or removes it, the same as a mouse drag. */
+(function builderTouchDrag() {
+  const pool = $('#bPool'), deck = $('#bDeck'); let hold = null, drag = null;
+  const paneAt = (x, y) => { const el = document.elementFromPoint(x, y); return el && (el.closest('#bPool') || el.closest('#bDeck')); };
+  const cancel = () => { if (hold) clearTimeout(hold.t); hold = null; if (drag) { drag.g.remove(); drag.src.classList.remove('dragging'); pool.classList.remove('droppable', 'over'); deck.classList.remove('droppable', 'over'); } drag = null; };
+  const startHold = from => e => {
+    if (e.touches.length !== 1) return cancel(); const t = e.target.closest('[data-id]'); if (!t) return;
+    const p0 = e.touches[0]; hold = { x: p0.clientX, y: p0.clientY, t: setTimeout(() => {
+      closeCardZoom(); const g = document.createElement('div'); g.className = 'tdrag'; g.style.backgroundImage = `url(${artUrl(t.dataset.id)})`;
+      const s = toStage({ clientX: hold.x, clientY: hold.y }); g.style.left = s.x + 'px'; g.style.top = s.y + 'px'; stage.appendChild(g);
+      drag = { id: t.dataset.id, from, g, src: t }; t.classList.add('dragging'); (from === 'pool' ? deck : pool).classList.add('droppable');
+      S.play('hover'); if (navigator.vibrate) navigator.vibrate(15); }, 260) };
+  };
+  const move = e => {
+    if (!hold && !drag) return; const p = e.touches[0];
+    if (!drag) { if (Math.hypot(p.clientX - hold.x, p.clientY - hold.y) > 10) cancel(); return; }
+    e.preventDefault(); const s = toStage(p); drag.g.style.left = s.x + 'px'; drag.g.style.top = s.y + 'px';
+    const target = drag.from === 'pool' ? deck : pool; target.classList.toggle('over', paneAt(p.clientX, p.clientY) === target);
+  };
+  const end = e => {
+    if (!drag) return cancel(); const p = e.changedTouches[0], d = drag, over = paneAt(p.clientX, p.clientY); cancel();
+    if (d.from === 'pool' && over === deck) addCard(d.id); else if (d.from === 'deck' && over === pool) removeCard(d.id);
+    e.preventDefault();
+  };
+  for (const [el, from] of [[pool, 'pool'], [deck, 'deck']]) {
+    el.addEventListener('touchstart', startHold(from), { passive: true }); el.addEventListener('touchmove', move, { passive: false });
+    el.addEventListener('touchend', end, { passive: false }); el.addEventListener('touchcancel', cancel);
+  }
+  // a long press would also bring up the browser's own menu or a right-click: neither belongs here
+  for (const el of [pool, deck]) el.addEventListener('contextmenu', e => { if (TOUCH) { e.preventDefault(); e.stopImmediatePropagation(); } }, true);
+})();
+
+/* Add to home screen, phones only (Zack, 2026-11-25: "on mobile only is it possible to add a one click 'add to home screen' button?").
+   Android's Chrome hands us an install prompt (beforeinstallprompt), so one tap installs; iPhones allow no website to do that, so the
+   same button shows the two steps (Share, then Add to Home Screen). Hidden once the game is opened from the home screen. */
+(function addToHome() {
+  const b = $('#a2hs'); let evt = null;
+  const installed = () => matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: fullscreen)').matches || navigator.standalone === true;
+  const upd = () => { b.hidden = !PHONE || installed() || localStorage.getItem('lrplay:a2hs') === 'done'; };
+  addEventListener('beforeinstallprompt', e => { e.preventDefault(); evt = e; upd(); });
+  addEventListener('appinstalled', () => { localStorage.setItem('lrplay:a2hs', 'done'); upd(); toast('Learn Retro Play is on your home screen.'); });
+  upd();
+  const ios = /[?&]ios\b/.test(location.search) || /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  b.onclick = async () => {
+    S.unlock(); S.play('click');
+    if (evt) { evt.prompt(); const r = await evt.userChoice.catch(() => null); evt = null; if (r && r.outcome === 'accepted') { localStorage.setItem('lrplay:a2hs', 'done'); upd(); } return; }
+    // the share sheet a website can open leaves out Add to Home Screen (on Zack's iPhone it offered Ask Gemini instead; 2026-11-25), so the
+    // guide walks through the browser's own menu: Share, View More, Add to Home Screen. Chrome on iPhone and Safari name it the same way.
+    const step = (n, icon, html) => `<div class="a2step"><b>${n}</b><span>${html}</span>${icon ? `<svg><use href="#i-${icon}"/></svg>` : ''}</div>`;
+    const chromeIOS = /CriOS/.test(navigator.userAgent);
+    const how = ios
+      ? (chromeIOS ? step(1, 'share', 'Tap the <b>Share</b> button next to the address bar.')
+                   : step(1, 'share', 'Tap <b>Share</b> in Safari’s toolbar. On newer iPhones, tap the <svg class="ii"><use href="#i-safmenu"/></svg> button to the left of the address bar, then <b>Share</b>.'))
+        + step(2, 'viewmore', 'Tap <b>View More</b> and scroll down the list.') + step(3, 'addhome', 'Tap <b>Add to Home Screen</b>, then <b>Add</b>.')
+      : step(1, 'dots', 'Open your browser’s menu, the three dots by the address bar.') + step(2, 'addhome', 'Tap <b>Install app</b> or <b>Add to Home screen</b>.');
+    const v = document.createElement('div'); v.className = 'veil'; v.style.zIndex = 60;
+    const p = document.createElement('div'); p.className = 'pn dlg a2dlg'; p.style.zIndex = 61;
+    p.innerHTML = `<h3 class="disp">Add to home screen</h3><div class="sub">Learn Retro Play opens full screen from its own icon, like an app. Free, nothing to download.</div>${how}<div class="btns"><button class="gb pri" data-x>Got it<span class="shine"></span></button></div>`;
+    stage.append(v, p); const close = () => { v.remove(); p.remove(); S.play('click'); }; v.onclick = close; p.querySelector('[data-x]').onclick = close;
+
+  };
+})();
+
+/* full screen on touch screens that allow it (Android); on an iPhone, Add to Home Screen opens the game full screen */
+(function fullBtn() {
+  const b = $('#gFull'); const can = TOUCH && document.fullscreenEnabled && document.documentElement.requestFullscreen;
+  if (!can) return; const upd = () => { b.hidden = !!document.fullscreenElement; }; upd();
+  document.addEventListener('fullscreenchange', upd);
+  b.onclick = () => { S.play('click'); document.documentElement.requestFullscreen({ navigationUI: 'hide' }).then(() => screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape').catch(() => {})).catch(() => {}); };
 })();
 
 /* My decks (Zack, 2026-11-24: "a rename and delete option"; no scroll bar): open, rename or delete each saved deck in this format */
@@ -450,18 +634,34 @@ $('#resAgain').onclick = () => startDuel();
    THE DUEL
    ===================================================================================================== */
 let table = null, camData = null, D = null; // D: the duel's client state
+const CAMS = {};
 async function ensureTable() {
   if (table) return;
-  camData = await (await fetch('assets/scenes/shop-camera.json')).json();
-  table = new Table($('#gl'), camData, { tokenArt: TOKEN_ART });
+  await makeTable();
+}
+async function makeTable() {
+  const key = MOBILE && !LAND ? 'shop-m' : 'shop';
+  camData = CAMS[key] || (CAMS[key] = await (await fetch(`assets/scenes/${key}-camera.json`)).json());
+  table = new Table($('#gl'), camData, { tokenArt: TOKEN_ART, view: MOBILE ? mview() : undefined });
   table.speed = SPEED[SET.speed];
   table.bindPointer($('#gl'), toStage);
   table.onHover = h => { $('#gl').classList.toggle('point', !!(h && (h.u != null || h.pile || h.zone))); if (!D) return; if (h && h.u != null) inspectU(h.u); else if (h && h.pile) hoverPile(h.pile); };
-  table.onClick = h => { if (D) fieldClick(h); };
+  table.onClick = h => { if (D) fieldClick(h); if (TOUCH && !h) $('#inspect').classList.add('hidden'); };
   table.onFrame = frameOverlay;
   // turn medallion and phase dial sit on the board's center line, just outside the mat
   const half = camData.board.BOARD_W / 2 + 0.62, L = table.project(new (table.camera.position.constructor)(-half, 0, 0)), R = table.project(new (table.camera.position.constructor)(half, 0, 0));
-  Object.assign($('#turnm').style, { left: L.x + 'px', top: L.y + 'px' }); Object.assign($('#dial').style, { left: R.x + 'px', top: R.y + 'px' });
+  if (!MOBILE) { Object.assign($('#turnm').style, { left: L.x + 'px', top: L.y + 'px' }); Object.assign($('#dial').style, { left: R.x + 'px', top: R.y + 'px' }); }
+  if (!MOBILE) { $('#turnm').style.removeProperty('display'); } else { $('#turnm').style.left = $('#turnm').style.top = $('#dial').style.left = $('#dial').style.top = ''; }
+  if (TOUCH) mobileDuelInput();
+  if (MOBILE) placeMid();
+}
+// turning a phone mid-duel: a fresh table (and canvas) for the new layout's camera, then every card, pile and highlight put back
+async function rebuildTable() {
+  const old = table; table = null; old.dispose();
+  const c = document.createElement('canvas'); c.id = 'gl'; $('#gl').replaceWith(c);
+  for (const el of [...badges.values()]) el.remove(); badges.clear(); for (const k in pileEls) { pileEls[k].remove(); delete pileEls[k]; }
+  await makeTable(); table.speed = SPEED[SET.speed];
+  if (D && D.view) { D.piles = {}; reconcile(D.view); renderChain(); if (D.prompt) setPrompt(D.prompt); }
 }
 async function startDuel() {
   const f = SEL.fmt, s = SEL[f];
@@ -470,8 +670,8 @@ async function startDuel() {
   S.play('shuffle');
   await ensureTable();
   const first = Math.random() < 0.5 ? 0 : 1;
-  $('#coin').textContent = '?'; $('#coin').style.animation = 'none'; void $('#coin').offsetWidth; $('#coin').style.animation = '';
-  await sleep(1150); $('#coin').textContent = first === 0 ? 'Y' : 'C'; $('#loadTxt').textContent = first === 0 ? 'You go first' : 'The computer goes first'; S.play('turn');
+  const coin = $('#coin'); coin.className = 'coin ' + (first === 0 ? 'heads' : 'tails'); coin.style.animation = 'none'; void coin.offsetWidth; coin.style.animation = '';
+  await sleep(1450); $('#loadTxt').textContent = first === 0 ? 'You go first' : 'The computer goes first'; S.play('turn');
   await sleep(1100);
   // reset the duel
   D = { fmt: f, you: youDeck.name, cpu: cpuDeck.name, youDeck, cpuDeck, first, q: [], busy: false, prompt: null, view: null, disp: null, lp: [8000, 8000], turn: 0, phase: '', tp: first,
@@ -499,7 +699,10 @@ async function pump() {
     const m = D.q.shift(); const myD = D;
     for (const l of m.log) D.log.push(l);
     clearInteract();
-    for (const ev of m.events) { try { await anim(ev); } catch (e) { console.error('anim', e, ev); } if (D !== myD) return; }
+    for (const ev of m.events) { try { await anim(ev); } catch (e) { console.error('anim', e, ev); } if (D !== myD) return;
+      // a beat after each computer play: summons, activations, attacks, flips, position changes, cards put on the field
+      const play = ['summon', 'chain', 'attack', 'flip', 'pos'].includes(ev.type) || (ev.type === 'move' && ['m', 'st', 'fz'].includes(ev.to));
+      if (play && (ev.p === 1 || (ev.p == null && D.tp === 1)) && BEAT[SET.speed]) await sleep(BEAT[SET.speed]); }
     reconcile(m.view);
     if (m.over) { D.busy = false; return endDuel(m.over); }
     if (m.prompt) setPrompt(m.prompt);
@@ -509,11 +712,14 @@ async function pump() {
 }
 const side = p => p === 0 ? 1 : -1;
 const handPoint = (p, u) => {
-  if (p === 0) { const el = u != null && $(`#hand [data-u="${u}"]`); const x = el ? parseFloat(el.style.left) + 70 + (960 - 550) : 960; return table.screenToWorld(x, 1020, 1.5); }
-  return table.screenToWorld(960, 40, 1.5);
+  const sr = stage.getBoundingClientRect(), mid = MOBILE ? (LAND ? LG.cx : SW / 2) : 960;
+  const at = el => { const r = el.getBoundingClientRect(); return { x: (r.left + r.width / 2 - sr.left) / scale, y: (r.top + r.height * 0.45 - sr.top) / scale }; };
+  if (p === 0) { const el = u != null && $(`#hand [data-u="${u}"]`); const pt = el ? at(el) : { x: mid, y: MOBILE ? SH - 110 : 1020 }; return table.screenToWorld(pt.x, Math.min(pt.y, (MOBILE ? SH : 1080) - 30), MOBILE ? 1.1 : 1.5); }
+  const cs = $$('#ohand .card'), el = cs[cs.length - 1]; const pt = el ? at(el) : { x: mid, y: MOBILE ? 40 : 40 };
+  return table.screenToWorld(pt.x, Math.max(pt.y, 12), MOBILE ? 1.1 : 1.5);
 };
 const pileKind = z => ({ deck: 'deck', deckTop: 'deck', extra: 'extra', gy: 'gy', ban: 'ban' }[z]);
-const waitMs = ms => sleep(ms * SPEED[SET.speed]);
+const waitMs = ms => sleep(ms * GAP[SET.speed]);
 
 async function anim(ev) {
   // a new turn or phase gets its banner first
@@ -562,12 +768,71 @@ async function anim(ev) {
     return;
   }
 }
+// the hand card flies over the table to its zone: from its own spot, growing or shrinking to the zone's size, turning for Defense
+// Position, showing its face or back as it will land; then the table card appears in the same place
+function stageBox(r) { const sr = stage.getBoundingClientRect(); return { x: (r.left - sr.left) / scale, y: (r.top - sr.top) / scale, w: r.width / scale, h: r.height / scale }; }
+function pileBox(sd, kind) { const c = table.pileTop(sd, kind), q = table.project(c), e = table.project(c.clone().setX(c.x + table.CW / 2)); const w = Math.abs(e.x - q.x) * 2; return { cx: q.x, cy: q.y, w }; }
+// a flat card flying over everything: from a box (stage pixels) to a centre point and width, turning by rot, its picture changing halfway
+// flying cards (Zack, 2026-11-25: "make sure the gameplay is extremely smooth when cards are in the hands, being played"): both pictures are
+// loaded before the card moves, so nothing pops in mid-flight, and a card that changes sides turns over in 3D on the way rather than
+// swapping its picture. The flight is one eased arc; a draw first lifts off the top of the Deck.
+const imgReady = new Map();
+function preload(src) {
+  if (!src) return Promise.resolve(); if (imgReady.has(src)) return imgReady.get(src);
+  const pr = new Promise(res => { const im = new Image(); im.onload = im.onerror = () => res(); im.src = src; if (im.decode) im.decode().then(res, res); });
+  imgReady.set(src, pr); return pr;
+}
+async function fly2D(b, to, o = {}) {
+  const a1 = o.from || 'img/back.webp', a2 = o.to || a1, flip = a2 !== a1;
+  await Promise.race([Promise.all([preload(a1), preload(a2)]), sleep(220)]);
+  // the card is drawn at the larger of its two sizes and scaled down from there, so it stays sharp the whole way (never blown up)
+  const W = Math.max(b.w, to.w), H = W * 614 / 421, sx = b.x + b.w / 2, sy = b.y + b.h / 2, s0 = b.w / W, s1 = to.w / W;
+  const fly = document.createElement('div'); fly.className = 'flyc';
+  fly.innerHTML = `<div class="fin"><i style="background-image:url(${a1})"></i>${flip ? `<i class="bk" style="background-image:url(${a2})"></i>` : ''}</div>`;
+  Object.assign(fly.style, { left: (sx - W / 2) + 'px', top: (sy - H / 2) + 'px', width: W + 'px', height: H + 'px' }); $('#layer').appendChild(fly);
+  const dx = to.cx - sx, dy = to.cy - sy, rot = o.rot || 0, dur = (o.dur || 440) * SPEED[SET.speed], arc = o.arc != null ? o.arc : 26;
+  const kf = [{ transform: `translate(0px,0px) scale(${s0}) rotate(0deg)`, offset: 0 }];
+  if (o.lift) kf.push({ transform: `translate(0px,${-o.lift}px) scale(${s0 * 1.06}) rotate(0deg)`, offset: 0.22, easing: 'ease-out' });
+  kf.push({ transform: `translate(${dx * 0.5}px,${dy * 0.5 - arc}px) scale(${(s0 + s1) / 2 * 1.04}) rotate(${rot / 2}deg)`, offset: o.lift ? 0.6 : 0.5 });
+  kf.push({ transform: `translate(${dx}px,${dy}px) scale(${s1}) rotate(${rot}deg)`, offset: 1 });
+  const an = fly.animate(kf, { duration: dur, easing: o.settle ? 'cubic-bezier(.25,.75,.35,1)' : 'cubic-bezier(.33,.66,.3,1)', fill: 'forwards' });
+  if (flip) fly.firstChild.animate([{ transform: 'rotateY(0deg)' }, { transform: 'rotateY(0deg)', offset: o.lift ? 0.25 : 0.12 }, { transform: 'rotateY(180deg)', offset: 0.85 }, { transform: 'rotateY(180deg)' }],
+    { duration: dur, easing: 'ease-in-out', fill: 'forwards' });
+  await an.finished.catch(() => {}); if (!o.keep) fly.remove(); return fly;
+}
+async function flyFromHand(r, ev, toSide) {
+  const zone = ev.to === 'fz' ? 'fz' : ev.to, up = ev.pos !== 'set', def = ev.to === 'm' && (ev.pos === 'def' || ev.pos === 'set');
+  const c = table.slot(toSide, zone, ev.zi), q = table.project(c), e = table.project(c.clone().setX(c.x + table.CW / 2));
+  const w1 = Math.abs(e.x - q.x) * 2 * (def ? table.DEF_S : 1), opp = toSide !== 1;
+  const start = ev.owner === 0 && ev.id != null ? artUrl(ev.id) : 'img/back.webp', end = up && ev.id != null ? artUrl(ev.id) : 'img/back.webp';
+  S.play(up ? 'place' : 'set');
+  const fly = await fly2D(stageBox(r), { cx: q.x, cy: q.y, w: w1 }, { from: start, to: end, rot: (opp ? 180 : 0) - (def ? 90 : 0), dur: 560, arc: 30, keep: true });   // turned the same way the table card lies (the 3D table turns counterclockwise for Defense Position), so a Set monster never lands the wrong way round and corrects itself (Zack, 2026-11-25)
+  await table.place(ev.u, toSide, zone, ev.zi, { id: ev.id, up, pos: ev.pos, from: c.clone().setY(0.06), fromUp: up, fromRotY: table.pose(toSide, def), dur: 90, lift: 0 });
+  fly.remove();
+}
 async function animMove(ev) {
   const p = ev.owner, fromSide = side(ev.prevCtrl != null && ['m', 'st', 'fz'].includes(ev.from) ? ev.prevCtrl : p), toSide = side(['m', 'st', 'fz'].includes(ev.to) ? ev.ctrl : p);
   const dp = D.disp.p; const fast = ev.reason === 'deal';
   // where it starts
   let from = null;
   if (['m', 'st', 'fz'].includes(ev.from)) from = table.where(ev.u);
+  else if (ev.from === 'hand' && ['m', 'st', 'fz'].includes(ev.to)) {
+    const el = p === 0 ? $(`#hand [data-u="${ev.u}"]`) : $$('#ohand .card').pop();
+    const r = el && el.getBoundingClientRect(); if (el && p === 0) el.style.visibility = 'hidden'; dropHand(p, ev.u);
+    if (r && r.width) { await flyFromHand(r, ev, toSide); return; }
+    from = handPoint(p, ev.u);
+  }
+  else if (ev.from === 'hand' && pileKind(ev.to)) {
+    // a discard (or any card from a hand to a pile): the hand card itself flies to the pile
+    const el = p === 0 ? $(`#hand [data-u="${ev.u}"]`) : $$('#ohand .card').pop(); const r = el && el.getBoundingClientRect();
+    if (el && p === 0) el.style.visibility = 'hidden'; dropHand(p, ev.u);
+    if (r && r.width) {
+      const k = pileKind(ev.to), shows = (k === 'gy' || k === 'ban') && ev.id != null;
+      S.play('set'); const a1 = p === 0 && ev.id != null ? artUrl(ev.id) : 'img/back.webp'; await fly2D(stageBox(r), pileBox(toSide, k), { from: a1, to: shows ? artUrl(ev.id) : a1, rot: toSide === 1 ? 0 : 180, dur: 440 });
+      bumpPile(toSide, k, +1, ev.u, ev.id); return;
+    }
+    from = handPoint(p, ev.u);
+  }
   else if (ev.from === 'hand') { from = handPoint(p, ev.u); dropHand(p, ev.u); }
   else if (pileKind(ev.from)) { from = table.pileTop(fromSide, pileKind(ev.from)); bumpPile(fromSide, pileKind(ev.from), -1, ev.u); }
   if (ev.destroyed && table.has(ev.u)) { S.play('destroy'); await table.shatter(ev.u); if (ev.owner === 1) D.stats.destroyed++; }
@@ -575,12 +840,29 @@ async function animMove(ev) {
   if (['m', 'st', 'fz'].includes(ev.to)) {
     const up = ev.pos !== 'set';
     S.play(up ? 'place' : 'set');
-    await table.place(ev.u, toSide, ev.to === 'fz' ? 'fz' : ev.to, ev.zi, { id: ev.id, up, pos: ev.pos, from, fromUp: ev.from === 'hand' && p === 0 ? true : up, dur: 460 });
+    await table.place(ev.u, toSide, ev.to === 'fz' ? 'fz' : ev.to, ev.zi, { id: ev.id, up, pos: ev.pos, from, fromUp: ev.from === 'hand' && p === 0 ? true : up, dur: ev.from === 'hand' ? 580 : 460 });
     return;
   }
   if (ev.to === 'hand') {
     const to = handPoint(p, null);
     if (table.has(ev.u)) await table.remove(ev.u, to, { up: p === 0, dur: 360 });
+    else if (from && pileKind(ev.from)) {
+      // a draw: the card's place in the hand is made first (hidden), and the card flies from the Deck straight into it
+      addHand(p, { u: ev.u, id: p === 0 ? ev.id : null });
+      const el = p === 0 ? $(`#hand [data-u="${ev.u}"]`) : $$('#ohand .card').pop();
+      if (el) { el.style.visibility = 'hidden'; S.play(fast ? 'deal' : 'draw');
+        // the draw lifts off the top of the Deck (the pile's top card, at its size), then flies into its own place in the hand
+        // it lands exactly where the card will rest: the new hand card skips its own rise-in, and the flight ends at its centre, its true
+        // (unturned) width and its tilt in the fan, so nothing overshoots or pops when the real card takes over (Zack, 2026-11-25)
+        el.classList.remove('in'); el.style.animation = 'none';
+        const pb = pileBox(fromSide, pileKind(ev.from)), ph = pb.w * 614 / 421, tb = stageBox(el.getBoundingClientRect());
+        const tilt = parseFloat((el.style.transform.match(/rotate\((-?[\d.]+)deg\)/) || [0, 0])[1]) || 0;
+        await fly2D({ x: pb.cx - pb.w / 2, y: pb.cy - ph / 2, w: pb.w, h: ph }, { cx: tb.x + tb.w / 2, cy: tb.y + tb.h / 2, w: el.offsetWidth },
+          { from: 'img/back.webp', to: p === 0 && ev.id != null ? artUrl(ev.id) : 'img/back.webp', rot: tilt, dur: fast ? 320 : 520, arc: 16, lift: fast ? 8 : 14, settle: true });
+        el.style.visibility = ''; }
+      if (fast) await waitMs(40);
+      return;
+    }
     else if (from) { S.play(fast ? 'deal' : 'draw'); await table.fly(p === 0 ? ev.id : null, from, to, { up: false, toUp: p === 0 && ev.id != null, rotY: p === 0 ? 0 : Math.PI, dur: fast ? 200 : 340, lift: 0.4 }); }
     addHand(p, { u: ev.u, id: p === 0 ? ev.id : null });
     if (fast) await waitMs(40);
@@ -630,19 +912,24 @@ function reconcile(v) {
 
 /* ---------- HUD pieces ---------- */
 function renderHands(newU) {
-  const h = D.disp.p[0].hand, n = h.length, step = Math.min(150, 900 / Math.max(1, n)), x0 = 550 - (step * (n - 1)) / 2 - 70;
+  const h = D.disp.p[0].hand, n = h.length;
+  // phones: 86-point cards fanned across the bottom, overlapping more as the hand grows
+  const hw = LAND ? 74 : HW, hx = LAND ? LG.cx : SW / 2, room = LAND ? SW - LCOL - RCOL + 40 : SW - 36;
+  const step = MOBILE ? Math.min(LAND ? 60 : 74, (room - hw) / Math.max(1, n - 1)) : Math.min(150, 900 / Math.max(1, n)), x0 = MOBILE ? hx - hw / 2 - (step * (n - 1)) / 2 : 550 - (step * (n - 1)) / 2 - 70;
   const el = $('#hand'); const old = new Map([...el.children].map(c => [+c.dataset.u, c]));
   h.forEach((c, i) => {
     let d = old.get(c.u); if (!d) { d = document.createElement('div'); d.className = 'hc in'; d.dataset.u = c.u; el.appendChild(d); }
     old.delete(c.u);
     d.style.backgroundImage = `url(${artUrl(c.id)})`; d.style.left = (x0 + i * step) + 'px';
-    const rot = (i - (n - 1) / 2) * Math.min(4, 24 / n); d.style.transform = `rotate(${rot}deg)`; d.style.zIndex = i + 1;
+    const rot = (i - (n - 1) / 2) * Math.min(MOBILE ? 3 : 4, 24 / n); d.style.transform = `rotate(${rot}deg)`; d.style.zIndex = i + 1;
   });
-  for (const d of old.values()) d.remove();
+  for (const d of old.values()) { d.classList.add('gone'); d.removeAttribute('data-u'); setTimeout(() => d.remove(), 240); }
   $('#hcMe').textContent = n;
-  const on = D.disp.p[1].hand.length, oe = $('#ohand'); oe.innerHTML = '';
-  const os = Math.min(92, 520 / Math.max(1, on)), ox = 300 - (os * (on - 1)) / 2 - 48;
-  for (let i = 0; i < on; i++) { const c = document.createElement('div'); c.className = 'card'; c.style.left = (ox + i * os) + 'px'; c.style.transform = `rotate(${(i - (on - 1) / 2) * -3}deg)`; oe.appendChild(c); }
+  const on = D.disp.p[1].hand.length, oe = $('#ohand'); /* the computer's hand keeps its cards between updates, so they slide and turn smoothly into their new places instead of being redrawn */
+  const os = MOBILE ? Math.min(30, 230 / Math.max(1, on)) : Math.min(92, 520 / Math.max(1, on)), ox = MOBILE ? (LAND ? LG.cx : SW / 2) - (os * (on - 1)) / 2 - 20 : 300 - (os * (on - 1)) / 2 - 48;
+  while (oe.children.length > on) oe.lastElementChild.remove();
+  while (oe.children.length < on) { const c = document.createElement('div'); c.className = 'card in'; oe.appendChild(c); }
+  [...oe.children].forEach((c, i) => { c.style.left = (ox + i * os) + 'px'; c.style.transform = `rotate(${(i - (on - 1) / 2) * -3}deg) translateZ(0)`; });
   $('#hcOp').textContent = on;
 }
 $('#hand').addEventListener('mouseover', e => { const c = e.target.closest('.hc'); if (c) { const h = D && D.disp.p[0].hand.find(x => x.u === +c.dataset.u); if (h) inspect(h.id); } });
@@ -656,7 +943,7 @@ function setLP(p, v, instant) {
   const step = () => { const k = Math.min(1, (performance.now() - t0) / dur); el.textContent = Math.round(from + (v - from) * k); if (k < 1) requestAnimationFrame(step); else { el.textContent = v; setTimeout(() => el.classList.remove('hit', 'heal'), 300); } };
   requestAnimationFrame(step); if (v < from) S.play('lp', { gap: 200 });
 }
-function popNum(p, txt, heal) { const d = document.createElement('div'); d.className = 'pop' + (heal ? ' heal' : ''); d.textContent = txt; Object.assign(d.style, p === 0 ? { left: '300px', top: '880px' } : { left: '1640px', top: '200px' }); $('#layer').appendChild(d); setTimeout(() => d.remove(), 1200); }
+function popNum(p, txt, heal) { const d = document.createElement('div'); d.className = 'pop' + (heal ? ' heal' : ''); d.textContent = txt; Object.assign(d.style, MOBILE ? (LAND ? (p === 0 ? { left: '100px', top: (SH - 110) + 'px' } : { left: '100px', top: '70px' }) : p === 0 ? { left: '230px', top: (SH - 150) + 'px' } : { left: '230px', top: '70px' }) : p === 0 ? { left: '300px', top: '880px' } : { left: '1640px', top: '200px' }); $('#layer').appendChild(d); setTimeout(() => d.remove(), 1200); }
 const PH = { draw: 'Draw', standby: 'Standby', main1: 'Main 1', battle: 'Battle', main2: 'Main 2', end: 'End', start: 'Draw' };
 function setPhase(ph) { $('#phaseTxt').textContent = PH[ph] || ph; $('#dial').classList.toggle('op', D.tp !== 0); if (ph !== 'start') S.play('phase', { gap: 300 }); }
 async function banner(txt, sub, op) {
@@ -666,9 +953,9 @@ async function banner(txt, sub, op) {
 }
 async function turnBanner() { S.play('turn'); $('#dial').classList.toggle('op', D.tp !== 0); await banner(D.tp === 0 ? 'Your Turn' : "Computer's Turn", `Turn ${D.turn}`, D.tp !== 0); }
 function renderChain() {
-  const el = $('#chainp'); if (!D.chain.length) { el.classList.add('hidden'); return; }
+  const el = $('#chainp'); $('#s-duel').classList.toggle('chaining', !!D.chain.length); if (!D.chain.length) { el.classList.add('hidden'); return; }
   el.classList.remove('hidden');
-  el.innerHTML = `<div class="ph">Chain · resolves top down</div>` + [...D.chain].reverse().map(L => `<div class="link ${L.p === 0 ? '' : 'op'} ${L.res ? 'res' : ''}"><div class="no disp">${L.link}</div><div class="card" style="background-image:url(${artUrl(L.id)})"></div><div><div class="t">${esc(L.name)}</div><div class="s">${L.p === 0 ? 'You' : 'Computer'}${L.res ? ' · resolving' : ''}</div></div></div>`).join('');
+  el.innerHTML = `<div class="ph">Chain · resolves top down</div>` + [...D.chain].reverse().map(L => `<div class="link ${L.p === 0 ? '' : 'op'} ${L.res ? 'res' : ''}" data-id="${L.id}"><div class="no disp">${L.link}</div><div class="card" style="background-image:url(${artUrl(L.id)})"></div><div><div class="t">${esc(L.name)}</div><div class="s">${L.p === 0 ? 'You' : 'Computer'}${L.res ? ' · resolving' : ''}</div></div></div>`).join('');
 }
 // ATK/DEF badges under monsters, counts on piles
 const badges = new Map();
@@ -684,6 +971,7 @@ function buildStats() {
 let pileEls = {};
 function pileCounts() {
   if (!D || !D.piles) return;
+  for (const [pi, s] of [[0, 1], [1, -1]]) { const pl = D.piles[s + ':ban'], n = pl ? pl.n : 0, b = $(pi === 0 ? '#banMe' : '#banOp'); if (b) { b.hidden = !n; b.querySelector('b').textContent = n; } }
   for (const s of [1, -1]) for (const k of ['deck', 'extra', 'gy', 'ban']) {
     const key = s + ':' + k, pl = D.piles[key]; let el = pileEls[key];
     if (!el) { el = document.createElement('div'); el.className = 'ct'; $('#ov').appendChild(el); pileEls[key] = el; }
@@ -699,8 +987,9 @@ function frameOverlay() {
 }
 
 /* ---------- inspect ---------- */
+let lastId = null;
 function inspect(id) {
-  if (id == null) return; const r = rec(D.fmt, id); if (!r) return; const el = $('#inspect');
+  if (id == null) return; lastId = id; const r = rec(D.fmt, id); if (!r) return; const el = $('#inspect');
   const mon = !['spell', 'trap'].includes(r.k);
   const meta = mon ? [r.a, r.r, r.k === 'token' ? 'Token' : null, r.lv ? `Level ${r.lv}` : null, `${r.atk} / ${r.def}`].filter(Boolean).join(' · ') : `${r.k === 'spell' ? 'Spell' : 'Trap'}${r.sub && r.sub !== 'Normal' ? ' · ' + r.sub : ''}`;
   const text = D.fmt === 'edison' && r.ps && !/^No rulings/.test(r.ps) ? r.ps : (r.tx || '');
@@ -714,6 +1003,7 @@ $('#gl').addEventListener('mouseleave', () => {});
 
 /* ---------- prompts: what you can do right now ---------- */
 function clearInteract() {
+  if (table) table.prefer = null;
   $$('#hand .hc').forEach(c => c.classList.remove('play', 'pick', 'up')); table && (table.unglowAll(), table.lightZones([]));
   closeMenu(); $('#hand').classList.remove('low'); $('#dial').classList.remove('ready'); D.sel = null; D.zoneMode = null; D.picks = null;
   $$('#layer .dlg, #layer .veil, #layer .respond').forEach(e => e.remove());
@@ -734,17 +1024,17 @@ function optsByU(pr) { const m = new Map(); for (const o of pr.opts) if (o.u != 
 function promptIdle(pr) {
   const by = optsByU(pr); D.byU = by;
   const battle = pr.text === 'Battle Phase';
-  $('#prompt').innerHTML = battle ? 'Battle Phase: pick a monster to attack with, or end the Battle Phase on the dial' : `${esc(pr.text)}: play a card, or use the phase dial to move on`;
+  $('#prompt').innerHTML = MOBILE ? (battle ? 'Battle Phase: pick an attacker, or tap Phase to end it' : `${esc(pr.text)}: play a card, or tap Phase to move on`) : battle ? 'Battle Phase: pick a monster to attack with, or end the Battle Phase on the dial' : `${esc(pr.text)}: play a card, or use the phase dial to move on`;
   $$('#hand .hc').forEach(c => c.classList.toggle('play', by.has(+c.dataset.u)));
   for (const u of by.keys()) if (table.has(u)) table.glow(u, battle ? 0xff5030 : 0xff7a30);
   if (pr.opts.some(o => o.kind === 'phase')) $('#dial').classList.add('ready');
   if (D.pendingU != null) { const u = D.pendingU; D.pendingU = null; const os = by.get(u); if (os) { const el = $(`#hand [data-u="${u}"]`); if (el) openMenu(u, os, el); else if (table.has(u)) openMenu(u, os, null, table.cardScreen(u, -1)); } }
-  if (SET.hintLimit !== 'off' && D.turn <= 2 && !D.hintShown) { D.hintShown = true; toast('Tip: click a glowing card to play it. The dial on the right moves to the next phase.', 4200); }
+  if (SET.hintLimit !== 'off' && D.turn <= 2 && !D.hintShown) { D.hintShown = true; toast(`Tip: ${TAP()} a glowing card to play it. The ${MOBILE ? 'phase button' : 'dial on the right'} moves to the next phase.`, 4200); }
 }
 function promptRespond(pr) {
   const by = optsByU(pr); D.byU = by;
   const mine = D.tp === 0; // on your own turn this window is optional: any other card you click keeps you playing
-  $('#prompt').innerHTML = mine ? `You can use an effect now, or click any card to keep playing <span class="key">Space</span> Continue` : `${esc(pr.text)} <span class="key">Space</span> Pass`;
+  $('#prompt').innerHTML = mine ? `You can use an effect now, or ${TAP()} any card to keep playing${TOUCH ? '' : ' <span class="key">Space</span> Continue'}` : `${esc(pr.text)}${TOUCH ? '' : ' <span class="key">Space</span> Pass'}`;
   $$('#hand .hc').forEach(c => c.classList.toggle('play', by.has(+c.dataset.u)));
   for (const u of by.keys()) if (table.has(u)) table.glow(u, 0x7fd3ff);
   const box = document.createElement('div'); box.className = 'pn amenu respond'; Object.assign(box.style, { right: '36px', bottom: '120px', position: 'absolute' });
@@ -762,7 +1052,8 @@ function promptPick(pr) {
   const handOnly = pr.opts.every(o => o.zone === 'hand' && o.owner === 0);
   if (onField || handOnly) {
     for (const o of pr.opts) { if (table.has(o.u)) table.glow(o.u, 0x7fd3ff); const h = $(`#hand [data-u="${o.u}"]`); if (h) h.classList.add('pick'); }
-    if (pr.max > 1 || pr.min !== 1) confirmBar(pr);
+    table.prefer = new Set(pr.opts.map(o => o.u));
+    if (pr.max > 1 || pr.min !== 1 || MOBILE) confirmBar(pr);
     return;
   }
   // cards in a Deck or Graveyard: show them laid out to pick from
@@ -781,7 +1072,7 @@ function promptPick(pr) {
 function togglePick(k, pr) { if (D.picks.has(k)) D.picks.delete(k); else { if (D.picks.size >= pr.max) { if (pr.max === 1) D.picks.clear(); else return; } D.picks.add(k); } S.play('click'); }
 function confirmBar(pr) {
   const box = document.createElement('div'); box.className = 'pn amenu respond'; Object.assign(box.style, { right: '36px', bottom: '120px', position: 'absolute' });
-  box.innerHTML = `<div class="ph">Chosen: <b id="pickN">0</b></div><button class="gb pri wide" data-ok disabled><svg><use href="#i-check"/></svg>Confirm<span class="key">Enter</span><span class="shine"></span></button>`;
+  box.innerHTML = `<div class="ph">Chosen: <b id="pickN">0</b></div><button class="gb pri wide" data-ok disabled><svg><use href="#i-check"/></svg><span class="cl">${MOBILE ? (pr.max === 1 ? 'Tap a target' : `Choose ${pr.min || 1}`) : 'Confirm'}</span><span class="key">Enter</span><span class="shine"></span></button>`;
   box.onclick = e => { const b = e.target.closest('[data-ok]'); if (b && !b.disabled) send([...D.picks]); };
   $('#layer').appendChild(box);
 }
@@ -790,8 +1081,11 @@ function pickU(u) {
   togglePick(o.key, pr);
   if (table.has(u)) table.glow(u, D.picks.has(o.key) ? 0xff7a30 : 0x7fd3ff);
   const h = $(`#hand [data-u="${u}"]`); if (h) { h.classList.toggle('play', D.picks.has(o.key)); h.classList.toggle('pick', !D.picks.has(o.key)); }
-  if (pr.max === 1 && pr.min === 1) { send([o.key]); return true; }
+  if (pr.max === 1 && pr.min === 1 && !MOBILE) { send([o.key]); return true; }
+  // phones: a single target waits for Confirm, which names the card, so a mis-tap never resolves anything
+  if (MOBILE && pr.max === 1) { for (const x of pr.opts) if (x.key !== o.key && table.has(x.u)) table.glow(x.u, 0x7fd3ff); const b = $('#layer [data-ok]'); if (b) { const nm = D.picks.size ? (o.label || nameOfU(u)) : ''; b.querySelector('.cl').textContent = nm ? `Confirm: ${nm}` : 'Confirm'; } }
   const n = $('#pickN'); if (n) n.textContent = D.picks.size; const ok = $('#layer [data-ok]'); if (ok) ok.disabled = !(D.picks.size >= pr.min && D.picks.size <= pr.max);
+  if (MOBILE && pr.max > 1 && ok) { const need = (pr.min || 1) - D.picks.size; ok.querySelector('.cl').textContent = need > 0 ? `Choose ${need} more` : `Confirm (${D.picks.size})`; }
   return true;
 }
 function promptChoose(pr) {
@@ -808,23 +1102,27 @@ function cardClick(u, el) {
   const pr = D.prompt; if (!pr) return;
   if (pr.type === 'pick') { pickU(u); return; }
   if (D.zoneMode) { cancelZone(); return; }
+  if (D.menu && D.menu.u === u) { closeMenu(); S.play('click'); return; }
   const os = D.byU && D.byU.get(u);
   if ((!os || !os.length) && pr.type === 'respond' && D.tp === 0) { D.pendingU = u; send(['pass']); return; }
   if (!os || !os.length) { S.play('error'); return; }
   if (pr.type === 'respond' && os.length === 1) { send([os[0].key]); return; }
   openMenu(u, os, el);
 }
+// a card you can't act on right now: show what it is (your own Set cards included; the engine sends their names to you only)
+function showCard(u) { const id = idAnyU(u); if (id == null) { S.play('error'); return; } if (MOBILE) cardSheet(id); else { inspect(id); S.play('click'); } }
 function fieldClick(h) {
   const pr = D.prompt;
   if (h && h.pile && !D.zoneMode && !(pr && pr.type === 'pick')) { pileView(h.pile.side === 1 ? 0 : 1, h.pile.kind); return; }
-  if (!pr) return;
+  if (!pr) { if (h && h.u != null) showCard(h.u); return; }
   if (D.zoneMode) { if (h && h.zone) placeInZone(h.zone); else cancelZone(); return; }
   if (!h) { closeMenu(); return; }
   if (h.u != null) {
     if (pr.type === 'pick') { pickU(h.u); return; }
+    if (D.menu && D.menu.u === h.u) { closeMenu(); S.play('click'); return; }
     const os = D.byU && D.byU.get(h.u);
     if (!os && pr.type === 'respond' && D.tp === 0) { D.pendingU = h.u; send(['pass']); return; }
-    if (!os) { S.play('error'); return; }
+    if (!os) { showCard(h.u); return; }
     if (pr.type === 'respond' && os.length === 1) { send([os[0].key]); return; }
     const p = table.cardScreen(h.u, -1); openMenu(h.u, os, null, p);
   }
@@ -834,19 +1132,22 @@ function openMenu(u, os, el, at) {
   closeMenu(); S.play('click');
   const m = document.createElement('div'); m.className = 'pn amenu'; m.id = 'amenu'; m.style.position = 'absolute';
   m.innerHTML = os.map((o, i) => `<button class="gb sm wide ${i === 0 ? 'pri' : ''}" data-k="${esc(o.key)}"><svg><use href="#${ICON[o.kind] || 'i-bolt'}"/></svg><span class="lbl">${esc(o.label)}</span><span class="key">${i + 1}</span><span class="shine"></span></button>`).join('');
+  if (MOBILE) { const id = idAnyU(u); m.classList.add('mrow'); if (id != null) m.insertAdjacentHTML('beforeend', `<button class="gb sm wide rd" data-read="${id}">Read<span class="shine"></span></button>`);
+    m.onclick = e => { const r = e.target.closest('[data-read]'); if (r) { cardSheet(r.dataset.read); return; } const b = e.target.closest('[data-k]'); if (b) choose(os.find(o => o.key === b.dataset.k)); };
+    $('#layer').appendChild(m); D.menu = { u, os }; if (el) el.classList.add('up'); $('#s-duel').classList.add('acting'); return; }
   let x, y; if (el) { const r = el.getBoundingClientRect(), sr = stage.getBoundingClientRect(); x = (r.left - sr.left) / scale + 70 - 150; y = 1080 - 190 - os.length * 54 - 30; }
   else { x = at.x - 150; y = at.y - 30 - os.length * 54; }
-  m.style.left = Math.max(20, Math.min(1600, x)) + 'px'; m.style.top = Math.max(150, y) + 'px';
+  m.style.left = Math.max(stage.classList.contains('phone') ? 650 : 20, Math.min(stage.classList.contains('phone') ? 1450 : 1600, x)) + 'px'; // on phones it clears the card text on the left m.style.top = Math.max(150, y) + 'px';
   m.onclick = e => { const b = e.target.closest('[data-k]'); if (b) choose(os.find(o => o.key === b.dataset.k)); };
   $('#layer').appendChild(m); D.menu = { u, os }; if (el) el.classList.add('up');
 }
-function closeMenu() { const m = $('#amenu'); if (m) m.remove(); $$('#hand .hc.up').forEach(c => c.classList.remove('up')); if (D) D.menu = null; }
+function closeMenu() { const m = $('#amenu'); if (m) m.remove(); $('#s-duel').classList.remove('acting'); $$('#hand .hc.up').forEach(c => c.classList.remove('up')); if (D) D.menu = null; }
 function choose(o) {
   closeMenu();
   const z = zoneFor(o);
   if (z) { // the player picks the zone; the engine places it there (E.act's zone hint)
     const P = D.view.p[0], free = P[z].map((c, i) => c ? -1 : i).filter(i => i >= 0);
-    if (free.length > 1) { $('#hand').classList.add('low'); D.zoneMode = { o, z }; table.lightZones(free.map(i => ({ side: 1, zone: z, i }))); $('#prompt').innerHTML = `Choose a zone for <b>${esc(nameOfU(o.u))}</b> <span class="key">Esc</span> Cancel`; S.play('click'); return; }
+    if (free.length > 1) { $('#hand').classList.add('low'); D.zoneMode = { o, z }; table.lightZones(free.map(i => ({ side: 1, zone: z, i }))); $('#prompt').innerHTML = TOUCH ? `${MOBILE ? 'Tap a lit zone' : 'Choose a zone'} for <b>${esc(nameOfU(o.u))}</b> <button class="pcx" id="zCancel">Cancel</button>` : `Choose a zone for <b>${esc(nameOfU(o.u))}</b> <span class="key">Esc</span> Cancel`; if ($('#zCancel')) $('#zCancel').onclick = e => { e.stopPropagation(); cancelZone(); }; S.play('click'); return; }
     if (free.length === 1) return send([o.key], { u: o.u, to: z, zi: free[0] });
   }
   send([o.key]);
@@ -868,7 +1169,7 @@ $('#dial').onclick = e => {
   const ph = D.prompt.opts.filter(o => o.kind === 'phase'); if (!ph.length) { S.play('error'); return; }
   closeMenu(); S.play('click');
   const m = document.createElement('div'); m.className = 'dial-menu'; m.id = 'amenu';
-  const r = $('#dial'); m.style.left = (parseFloat(r.style.left) - 120) + 'px'; m.style.top = (parseFloat(r.style.top) + 70) + 'px';
+  const r = $('#dial'); if (MOBILE) m.classList.add('mrow'); else { m.style.left = (parseFloat(r.style.left) - 120) + 'px'; m.style.top = (parseFloat(r.style.top) + 70) + 'px'; }
   m.innerHTML = ph.map(o => `<button class="gb sm" data-k="${o.key}"><svg><use href="#${o.key === 'bp' ? 'i-swords' : 'i-end'}"/></svg>${esc(o.label)}<span class="key">${o.key === 'bp' ? 'B' : 'E'}</span><span class="shine"></span></button>`).join('');
   m.onclick = ev => { const b = ev.target.closest('[data-k]'); if (b) send([b.dataset.k]); };
   $('#layer').appendChild(m);
@@ -887,14 +1188,15 @@ function duelKey(e) {
 
 /* ---------- tools ---------- */
 $('#tHint').onclick = askHint;
-$('#tSpeed').onclick = () => { const order = ['normal', 'fast', 'instant', 'relaxed']; SET.speed = order[(order.indexOf(SET.speed) + 1) % order.length]; saveSet(); table.speed = SPEED[SET.speed]; toast('Duel speed: ' + SET.speed); S.play('click'); };
+$('#tSpeed').onclick = () => { const order = ['relaxed', 'normal', 'fast', 'instant']; SET.speed = order[(order.indexOf(SET.speed) + 1) % order.length]; saveSet(); table.speed = SPEED[SET.speed]; toast('Duel speed: ' + SET.speed); S.play('click'); };
 const soundIcon = () => $('#tSound use').setAttribute('href', SET.muted ? '#i-mute' : '#i-sound');
 $('#tSound').onclick = () => { SET.muted = !SET.muted; S.setMuted(SET.muted); saveSet(); soundIcon(); S.play('click'); }; soundIcon();
 $('#tLog').onclick = () => {
   const old = $('#logp'); if (old) { old.remove(); return; } S.play('click');
   const p = document.createElement('div'); p.className = 'pn logp'; p.id = 'logp';
-  p.innerHTML = `<div class="ph">Duel log</div><div class="lines">${D.log.map(l => `<div class="${/^— Turn/.test(l) ? 'turn' : ''}">${esc(l)}</div>`).join('')}</div>`;
+  p.innerHTML = `<button class="gb sm ico x" data-x title="Close"><svg><use href="#i-x"/></svg><span class="shine"></span></button><div class="ph">Duel log</div><div class="lines">${D.log.map(l => `<div class="${/^— Turn/.test(l) ? 'turn' : ''}">${esc(l)}</div>`).join('')}</div>`;
   $('#layer').appendChild(p); const ln = p.querySelector('.lines'); ln.scrollTop = ln.scrollHeight;
+  p.querySelector('[data-x]').onclick = () => { p.remove(); S.play('click'); };
 };
 // the duel menu (Zack, 2026-11-24: "a menu/settings/quit option in the duel... adjust settings and quit to main menu during a game. will ask if youre sure")
 function duelMenu() {
@@ -902,7 +1204,7 @@ function duelMenu() {
   S.play('click'); const v = document.createElement('div'); v.className = 'veil'; v.id = 'pauseVeil'; const dl = document.createElement('div'); dl.className = 'pn dlg pmenu'; dl.id = 'pauseMenu';
   const rows = () => SETROWS.map((r, i) => [r, i]).filter(([r]) => r.k !== 'table').map(([r, i]) => { const v2 = SET[r.k] != null ? SET[r.k] : r.vals[0];
     const val = r.blocks ? `<span class="blocks">${r.vals.slice(1).map(x => `<i class="${x <= v2 ? 'f' : ''}"></i>`).join('')}</span><span class="vn">${v2}</span>` : `<span class="vt">${r.lab(v2)}</span>`;
-    return `<div class="vrow" data-i="${i}"><span>${r.name}</span><span class="dots"></span><span class="val"><span class="arr" data-d="-1">◀</span>${val}<span class="arr" data-d="1">▶</span></span></div>`; }).join('');
+    return `<div class="vrow" data-i="${i}"><span>${r.name}</span><span class="dots"></span><span class="val"><span class="arr" data-d="-1"><svg><use href="#i-tl"/></svg></span>${val}<span class="arr" data-d="1"><svg><use href="#i-tr"/></svg></span></span></div>`; }).join('');
   const main = () => { dl.innerHTML = `<h3 class="disp">Menu</h3><div class="opts">
       <button class="gb wide pri" data-a="resume"><span class="lbl">Resume</span><span class="key">Esc</span><span class="shine"></span></button>
       <button class="gb wide" data-a="settings"><svg><use href="#i-cog"/></svg><span class="lbl">Settings</span><span class="shine"></span></button>
@@ -925,13 +1227,49 @@ function duelMenu() {
 }
 function closeDuelMenu() { const a = $('#pauseMenu'), b = $('#pauseVeil'); if (a) { a.remove(); b && b.remove(); S.play('click'); return true; } return false; }
 $('#tMenu').onclick = duelMenu;
+$('#banMe').onclick = () => pileView(0, 'ban'); $('#banOp').onclick = () => pileView(1, 'ban');
+
+/* ---------- phone duel input (the phone layout) ----------
+   Hold a card (in your hand, on the field or a pile top) to read it in a sheet that slides up; a tap still plays. */
+function idAnyU(u) { if (!D) return null; const h = D.disp.p[0].hand.find(x => x.u === u); if (h && h.id != null) return h.id; return D.view ? idOfU(u) : null; }
+function cardSheet(id) {
+  if (id == null) return; const f = D ? D.fmt : B.fmt, r = rec(f, id); if (!r) return; closeSheet(); S.play('click');
+  const v = document.createElement('div'); v.className = 'veil msv'; v.id = 'msVeil';
+  const p = document.createElement('div'); p.className = 'msheet'; p.id = 'msheet';
+  const mon = !['spell', 'trap'].includes(r.k);
+  p.innerHTML = `<div class="grab"></div><div class="mtop"><div class="card" style="background-image:url(${artUrl(id)})"></div><div class="mh"><h3>${esc(r.n)}</h3><div class="meta">${esc(cardMeta(r))}</div>${mon && r.atk != null ? `<div class="num disp">${esc(r.atk)}<i> / ${esc(r.def)}</i></div>` : ''}</div></div><p>${esc(cardText(f, r))}</p><button class="gb wide" data-x>Close<span class="shine"></span></button>`;
+  (cur === 'duel' ? $('#layer') : stage).append(v, p);
+  const close = () => closeSheet(); v.onclick = close; p.querySelector('[data-x]').onclick = close;
+  let y0 = null; p.addEventListener('touchstart', e => { y0 = e.touches[0].clientY; }, { passive: true });
+  p.addEventListener('touchmove', e => { if (y0 == null) return; const dy = e.touches[0].clientY - y0; if (dy > 0 && p.scrollTop <= 0) p.style.transform = `translateY(${dy}px)`; }, { passive: true });
+  p.addEventListener('touchend', e => { const dy = e.changedTouches[0].clientY - (y0 == null ? 0 : y0); y0 = null; if (dy > 90 && p.scrollTop <= 0) close(); else p.style.transform = ''; });
+}
+function closeSheet() { const a = $('#msheet'), b = $('#msVeil'); if (a) { a.remove(); b && b.remove(); return true; } return false; }
+let mobileBound = false;
+function mobileDuelInput() {
+  if (mobileBound) return; mobileBound = true;
+  let hold = null, ate = false;
+  const start = (e, idFn) => { if (!MOBILE || (e.pointerType === 'mouse' && !FORCE_M)) return; const x = e.clientX, y = e.clientY;
+    hold = { x, y, t: setTimeout(() => { const id = idFn(); hold = null; if (id != null) { ate = true; if (navigator.vibrate) navigator.vibrate(12); cardSheet(id); } }, 430) }; };
+  const cancel = () => { if (hold) clearTimeout(hold.t); hold = null; };
+  const moveC = e => { if (hold && Math.hypot(e.clientX - hold.x, e.clientY - hold.y) > 10) cancel(); };
+  $('#hand').addEventListener('pointerdown', e => { const c = e.target.closest('.hc'); if (c) start(e, () => idAnyU(+c.dataset.u)); });
+  const duel = $('#s-duel');
+  duel.addEventListener('pointerdown', e => { if (e.target.id === 'gl') start(e, () => lastId); });  // the table's own pointerdown (on the canvas) has just set lastId
+  for (const el of [$('#hand'), duel]) { el.addEventListener('pointermove', moveC); el.addEventListener('pointerup', cancel); el.addEventListener('pointercancel', cancel); el.addEventListener('contextmenu', e => e.preventDefault()); }
+  // the click that ends a hold only opened the sheet: it must not also play the card
+  addEventListener('click', e => { if (ate) { ate = false; e.stopPropagation(); e.preventDefault(); } }, true);
+  // tapping a chain link reads its card
+  $('#chainp').addEventListener('click', e => { const l = e.target.closest('[data-id]'); if (l) cardSheet(l.dataset.id); });
+}
+
 function toast(t, ms = 2600) { const d = document.createElement('div'); d.className = 'pn toast'; d.textContent = t; (cur === 'duel' ? $('#layer') : stage).appendChild(d); setTimeout(() => d.remove(), ms); }
 
 
 /* ---------- hints (Zack, 2026-11-24): the strongest play and why, with a per-duel limit set in Settings ---------- */
 const hintLimit = () => SET.hintLimit === 'unlimited' ? Infinity : SET.hintLimit === 'off' ? 0 : +SET.hintLimit;
 function hintsLeft() { return D ? Math.max(0, hintLimit() - (D.hintsUsed || 0)) : 0; }
-function hintButton() { const b = $('#tHint'); if (!b) return; const n = hintsLeft(); b.innerHTML = `<svg><use href="#i-bulb"/></svg>Hint${hintLimit() === Infinity ? '' : ` <span class="left">${n} left</span>`}<span class="key">H</span><span class="shine"></span>`; b.disabled = hintLimit() === 0 || n === 0; }
+function hintButton() { const b = $('#tHint'); if (!b) return; const n = hintsLeft(); b.innerHTML = `<svg><use href="#i-bulb"/></svg>Hint${hintLimit() === Infinity ? '' : ` <span class="left"><b>${n}</b> left</span>`}<span class="key">H</span><span class="shine"></span>`; b.disabled = hintLimit() === 0 || n === 0; }
 function askHint() {
   if (!D || !D.prompt) return; if (!AUTO) { if (hintLimit() === 0) { toast('Hints are off. Turn them on in Settings.'); return; } if (!hintsLeft()) { toast('No hints left this duel.'); S.play('error'); return; } }
   S.play('click'); W.postMessage({ type: 'hint' }); $('#prompt').innerHTML = 'Thinking about your best play…';
@@ -1067,6 +1405,6 @@ function updateTicker() {
   const n = f => READY ? READY[f].decks.filter(d => d.ready).length : 0;
   // a static bar, the main points only (Zack, 2026-11-24: "make the bottom bars stop scrolling... simple and direct")
   const items = [`Goat: ${n('goat')} decks`, `Edison: ${n('edison')} decks`, '4 computer levels', ms.length ? `Your record: ${w}–${l}` : 'Build your own deck in Decks'];
-  $('#ticker').textContent = items.join('   ◆   ');
+  $('#ticker').innerHTML = items.map(esc).join(' <i class="dia"></i> ');
 }
 readyP.then(() => { if (cur === 'format') renderFormats(); updateTicker(); const sc = new URLSearchParams(location.search).get('screen'); if (sc) { if (sc === 'build') B.deck = null; show(sc); if (sc === 'list') { show('deck'); setTimeout(() => $('#seeList') && $('#seeList').click(), 300); } } });
