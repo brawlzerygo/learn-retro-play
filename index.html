@@ -9,8 +9,8 @@
 <link rel="icon" href="assets/icon-32.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Atkinson+Hyperlegible+Next:wght@500;700;800&family=Barlow+Condensed:ital,wght@0,600;0,700;0,800;1,700;1,800;1,900&family=VT323&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/game.css?v=24">
-<link rel="stylesheet" href="css/rewind.css?v=24">
+<link rel="stylesheet" href="css/game.css?v=33">
+<link rel="stylesheet" href="css/rewind.css?v=33">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute">
@@ -56,6 +56,7 @@
       <div class="mi" data-href="https://learnretro.com/">Lessons</div>
     </div>
     <div class="bug">LR <span>PLAY</span></div>
+    <div class="savenote">Your decks, stats and settings are saved in this browser. Clearing cookies and site data deletes them.</div>
     <div class="legal">Yu-Gi-Oh! is a trademark of Shueisha and Konami. Card names, text and art are the property of Konami Digital Entertainment, used here for a free, non-commercial fan learning project. Learn Retro is not affiliated with Konami or 4K Media.</div>
     <div class="ticker"><div class="tk" id="ticker">LEARN RETRO PLAY</div></div>
   </section>
@@ -68,7 +69,7 @@
     <h2 class="htitle disp">Settings</h2>
     <div class="vlist" id="setList"></div>
     <div class="vdesc" id="setDesc"></div>
-    <div class="ticker"><div class="tk">↑↓ Choose a setting &nbsp;◆&nbsp; ←→ Change it</div></div>
+    <div class="ticker"><div class="tk">↑↓ Choose a setting &nbsp;◆&nbsp; ←→ Change it &nbsp;◆&nbsp; Decks, stats and settings are saved in this browser. Clearing cookies and site data deletes them.</div></div>
   </section>
 
   <!-- FORMAT -->
@@ -100,11 +101,12 @@
   <section class="screen" id="s-build">
     <div class="menubg bc"></div>
     <div class="board" id="bBoard"></div>
+    <div class="savebar bd"><i>i</i>Your decks, stats and settings are saved in this browser. Clearing cookies and site data deletes them.</div>
     <div class="bbar" id="bBar"></div>
     <div class="pool2" id="bPool"></div>
     <div class="roster" id="bDeck"></div>
     <div class="pn bpeek hidden" id="bPeek"></div>
-    <div class="ticker"><div class="tk">Click a card to add it &nbsp;◆&nbsp; Click it in your deck to remove it &nbsp;◆&nbsp; Hover to read</div></div>
+    <div class="bkeys"><div class="kh"><span class="key">Click</span>Read a card</div><div class="kh"><span class="key">Drag</span>Add to or remove from your deck</div><div class="kh"><span class="key">Right-click</span>Quick add or remove</div><div class="kh"><span class="key">Esc</span>Close or go back</div><div class="sp"></div><div class="bstat" id="bStat"></div></div>
   </section>
 
   <!-- DUEL -->
@@ -149,6 +151,7 @@
     <div class="crumbs cap"><span>Home</span><i></i><span class="on">Stats</span></div>
     <h2 class="htitle disp">Your Stats</h2>
     <div class="seg sfmt" id="stFmt"></div>
+    <div class="savebar st"><i>i</i>Your decks, stats and settings are saved in this browser. Clearing cookies and site data deletes them.</div>
     <div id="stBody"></div>
     <div class="keybar"><div class="kh"><span class="key">Esc</span>Back</div><div class="sp"></div></div>
   </section>
@@ -166,6 +169,6 @@
 <script src="data/edison.js"></script>
 <script src="data/goat.js"></script>
 <script src="data/tokens.js"></script>
-<script type="module" src="js/game.js?v=24"></script>
+<script type="module" src="js/game.js?v=33"></script>
 </body>
 </html>
