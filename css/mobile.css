@@ -39,8 +39,8 @@ html.m,html.m body{background:#0b0c10;overflow:hidden;height:100%}
 #stage.m #mainMenu .mi{position:relative;isolation:isolate;justify-content:center;height:54px;font:italic 900 22px 'Barlow Condensed';text-transform:uppercase;color:#fff;transform:none;gap:6px}
 #stage.m #mainMenu .mi::after{display:none}
 #stage.m #mainMenu .mi::before{display:block;content:"";position:absolute;inset:0;z-index:-1;transform:skewX(-10deg);background:#1d2127;border-radius:3px;clip-path:none;box-shadow:inset 0 -3px 0 rgba(255,255,255,.06),0 8px 18px rgba(0,0,0,.45)}
-#stage.m #mainMenu .mi[data-go=format]{grid-column:1/-1;height:68px;font-size:32px;color:#140a04}
-#stage.m #mainMenu .mi[data-go=format]::before{background:var(--acc);box-shadow:0 10px 26px -8px rgba(255,106,31,.9)}
+#stage.m #mainMenu .mi[data-go=mode]{grid-column:1/-1;height:68px;font-size:32px;color:#140a04}
+#stage.m #mainMenu .mi[data-go=mode]::before{background:var(--acc);box-shadow:0 10px 26px -8px rgba(255,106,31,.9)}
 #stage.m #mainMenu .mi[data-go=stats],#stage.m #mainMenu .mi[data-go=settings]{display:none}
 #stage.m #mainMenu .mi.lock{color:rgba(255,255,255,.4)}
 #stage.m #mainMenu .mi .soon{font:800 11px 'Barlow Condensed';letter-spacing:.1em;text-transform:uppercase;color:var(--acc-hi)}
@@ -420,7 +420,7 @@ html.m,html.m body{background:#0b0c10;overflow:hidden;height:100%}
 #stage.ml #s-title{grid-template-columns:1fr minmax(220px,38%);grid-template-rows:auto auto 1fr auto auto;column-gap:24px;padding:10px calc(var(--sar) + 16px) calc(var(--sab) + 54px) calc(var(--sal) + 16px)}
 #stage.ml #s-title .ttl-logo{grid-column:1;grid-row:1}
 #stage.ml #s-title #mainMenu{grid-column:1;grid-row:2;margin-top:12px}
-#stage.ml #s-title #mainMenu .mi[data-go=format]{height:56px;font-size:28px}
+#stage.ml #s-title #mainMenu .mi[data-go=mode]{height:56px;font-size:28px}
 #stage.ml #s-title #mainMenu .mi{height:44px}
 #stage.ml #s-title .savenote{grid-column:1;grid-row:4;margin-top:8px;padding-top:0}
 #stage.ml #s-title .legal{grid-column:1;grid-row:5}
@@ -658,3 +658,117 @@ html.m,html.m body{position:fixed;inset:0;width:100%;height:100%;margin:0}
 /* the home-screen app: iOS lays the page out 59 points shorter than the screen it draws on; the page box takes the full screen */
 html.m.hs,html.m.hs body{position:absolute;left:0;top:0;right:auto;bottom:auto;width:100%;height:calc(100vh + env(safe-area-inset-top,0px));min-height:100lvh}
 html.m.hs #stage.m{position:absolute}
+/* Draft on phones: three small cards in a row, tap one to read it, then Pick */
+#stage.m #mainMenu .mi[data-practice]{order:0}
+#stage.m .draft{position:relative;left:auto;right:auto;top:auto;bottom:auto;padding:0 16px calc(var(--sab) + 24px);gap:12px}
+#stage.m .draft .dintro{font-size:15px}
+#stage.m .draft .drow{display:flex;flex-direction:column;gap:14px;padding:0}
+#stage.m .draft .drow .fmt{height:200px}#stage.m .draft .drow .fmt h3{font-size:48px}#stage.m .draft .drow .fmt p{font-size:14px}
+#stage.m .dsub .tg{font-size:11px}#stage.m .dsub .dpool{font-size:16px}
+#stage.m .dopts{grid-template-columns:repeat(3,1fr);gap:8px;flex:none}
+#stage.m .dopt{display:block;padding:0}
+#stage.m .dopt::before{display:none}
+#stage.m .dopt .card{width:100%;height:auto;aspect-ratio:421/614;border-radius:5px}
+#stage.m .dopt .card:hover{transform:none}
+#stage.m .dopt.sel .card{box-shadow:0 0 0 3px var(--acc),0 0 18px rgba(255,106,31,.6)}
+#stage.m .dopt .dtx,#stage.m .dopt .dgo{display:none}
+#stage.m .dread{min-height:120px;padding:12px 14px;background:rgba(16,18,22,.94);border-radius:3px}
+#stage.m .dread .nm{font-size:24px;line-height:1;text-transform:uppercase}
+#stage.m .dread .meta{font-size:12px;color:var(--acc-hi);margin:6px 0}
+#stage.m .dread p{font-size:14px;line-height:1.45}
+#stage.m .dpick{width:100%;justify-content:center}
+#stage.m .dstat{flex-wrap:wrap;gap:8px 16px;font-size:13px}#stage.m .dstat b{font-size:22px}
+#stage.m .dstat #dSee{margin-left:0}
+#stage.m .ddone{flex-direction:column;gap:10px;align-items:stretch}
+#stage.m .ddone .dk-fan{width:100%;height:220px}
+#stage.m .ddone .dk-fan .card{width:120px;height:175px}
+#stage.m .ddone .dk-fan .card[data-j="0"]{left:calc(50% - 150px)}#stage.m .ddone .dk-fan .card[data-j="1"]{left:calc(50% - 60px)}#stage.m .ddone .dk-fan .card[data-j="2"]{left:calc(50% + 30px)}
+#stage.m .ddone .dinfo p{font-size:15px}
+#stage.m .dname input{height:48px;font-size:22px}
+#stage.m .ddone .row .gb{flex:1;justify-content:center}
+#stage.m .ddone .dinfo{padding:18px 16px}
+#stage.m #mainMenu .mi[data-href]{grid-column:auto;height:54px;font-size:22px}
+#stage.m .dstat{display:grid;grid-template-columns:repeat(4,1fr);gap:10px 6px;font-size:11px;text-align:center;line-height:1.2}
+#stage.m .dstat b{display:block;font-size:24px;margin:0}
+#stage.m .dstat .gb{grid-column:span 2;justify-content:center}
+/* lighter on phones (Zack, 2026-11-25: the phone ran hot): the hand glow's running light repainted every playable card each frame,
+   so on phones the gradient border holds still and only the soft glow breathes (an opacity change the GPU does alone); the title's drifting dust stops */
+#stage.m .hc.play::before,#stage.m .hc.pick::before{animation:none;--gang:200deg}
+#stage.m .hc.play::after,#stage.m .hc.pick::after{will-change:opacity}
+#stage.m .dust{animation:none}
+/* Duel modes and draft pool groups on phones */
+#stage.m .moderow .fmt{height:150px}#stage.m .moderow .fmt h3{font-size:44px}#stage.m .moderow .fmt p{font-size:14px}
+#stage.ml .moderow{flex-wrap:wrap}#stage.ml .moderow .fmt{flex:1 1 30%;height:150px}
+#stage.m .fmt.lock{opacity:.5}
+#stage.m .dgroups{display:flex;flex-direction:column;gap:14px}#stage.m .dgrp .ph{margin:0 0 8px}
+#stage.m .draft .drow .fmt{height:150px}#stage.m .draft .drow .fmt h3{font-size:40px}
+#stage.m .draft .rndrow .fmt{height:130px}#stage.m .draft .rndrow .fmt h3{font-size:36px}#stage.m .draft .rndrow .fmt p{font-size:13px}
+#stage.m #rndBody > .row .gb,#stage.m #draftBody > .row .gb{flex:1;justify-content:center}
+/* Sealed on phones: a smaller pack, pulls in rows of three */
+#stage.m .pack{width:200px;height:320px}#stage.m .pk-art{left:18px;right:18px;top:50px;height:160px}#stage.m .pk-logo{top:220px;font-size:22px}#stage.m .pk-name{top:248px;font-size:28px}#stage.m .pk-top{height:24px}
+#stage.m .packstage{min-height:360px}
+#stage.m .pullrow{display:grid;grid-template-columns:repeat(3,1fr);gap:12px 10px;width:100%}#stage.m .pull{width:auto;height:auto}#stage.m .pull .fc{width:100%;height:auto;aspect-ratio:421/614}
+#stage.m .pull .tg{position:static;margin-top:6px;font-size:10px}
+#stage.m .moderow .tg.hot{display:none}
+#stage.m .prow .gb,#stage.m #sealBody > .row .gb{flex:1;justify-content:center}
+#stage.m .pulls{grid-template-columns:repeat(4,1fr);gap:8px;max-height:none;overflow:visible}
+#stage.m .restart{right:16px;top:calc(var(--sat) + 10px);height:44px}
+#stage.m .fmt .tg{top:12px;left:14px;font-size:10px}
+#stage.m .dgrp .fmt .tg{left:auto;right:14px}
+#stage.m .draft .tscroll{overflow:visible;padding:0;gap:14px}
+#stage.m .draft .tscroll .rndrow{display:grid;grid-template-columns:1fr 1fr;grid-auto-rows:130px;gap:10px}
+#stage.m .draft .tscroll .rndrow .fmt{height:auto}#stage.m .draft .tscroll .rndrow .fmt h3{font-size:26px}#stage.m .draft .tscroll .rndrow .fmt p{display:none}
+#stage.m .draft .tscroll .rndrow .fmt .txt{left:12px;right:12px;bottom:12px}
+#stage.m .dcont{flex-wrap:wrap;gap:10px;padding:10px}#stage.m .dcont .dc-art{width:96px;height:56px}#stage.m .dcont h3{font-size:24px}#stage.m .dcont p{font-size:13px}
+#stage.m .dcont .gb{flex:1;justify-content:center}
+/* packs and the booster box on phones (PWA): smaller, the same look */
+#stage.m .pack{width:220px;height:352px}#stage.m .pack .pk-art{left:16px;right:16px;top:52px;height:180px}
+#stage.m .pk-crimp{height:16px}#stage.m .pack .pk-logo{top:24px;font-size:17px}
+#stage.m .pack .pk-name{top:244px;font-size:30px}#stage.m .pack .pk-sub{top:280px;font-size:12px}#stage.m .pk-foot{bottom:22px;font-size:10px;left:14px;right:14px}
+#stage.m .bbox{width:280px;height:200px;margin:40px 34px 10px 0}#stage.m .bx-top{top:-30px;height:30px;transform:skewX(-45deg) translateX(15px)}
+#stage.m .bx-side{right:-30px;top:-15px;width:30px;bottom:15px;transform:skewY(-45deg) translateY(15px)}
+#stage.m .bx-name{font-size:32px;bottom:38px}#stage.m .bx-sub{font-size:12px;bottom:14px}#stage.m .bbox .pk-logo{font-size:18px;top:12px}
+#stage.m .packstage{flex-direction:column;justify-content:center}#stage.m .pullrow:empty{display:none}
+#stage.m .prow{position:sticky;bottom:calc(var(--sab) + 12px);z-index:5;padding-top:10px}
+#stage.m .czoom.read{left:0;right:0;transform:none;top:calc(var(--sat) + 64px);position:fixed}
+#stage.m .pcount{right:8px;top:8px;gap:4px;padding:2px 4px}#stage.m .pm{width:34px;height:34px}#stage.m .pcount b{font-size:20px}
+#stage.m .pstr{left:8px;top:auto;bottom:44px;font-size:9px;padding:2px 5px}
+#stage.m .mixbar{position:sticky;bottom:calc(var(--sab) + 10px);z-index:6;flex-wrap:wrap;gap:8px;padding:10px}
+#stage.m .mixbar .dprog{order:3;flex-basis:100%}#stage.m .mixbar .gb{flex:1;justify-content:center}#stage.m .mixbar .mx-n{font-size:14px;flex-basis:100%}
+/* Classic Foil on phones (PWA): the same design, scaled */
+#stage.m .pack{--k:.85;width:calc(260px * var(--k));height:calc(420px * var(--k))}
+#stage.m .bbox{--k:.66;width:calc(466px * var(--k));height:calc(326px * var(--k));margin:10px 0}
+#stage.m .mgrid.packs{grid-template-columns:1fr 1fr;gap:14px 8px}#stage.m .mgrid.boxes{grid-template-columns:1fr;gap:14px}
+#stage.m .mpack{width:calc(260px * .56);height:calc(420px * .56)}#stage.m .mpack .cfp{--k:.56}
+#stage.m .mbox{width:calc(466px * .62);height:calc(326px * .62)}#stage.m .mbox .cfb{--k:.62}
+#stage.m .mcell p{font-size:12px}#stage.m .mcell{padding:8px 4px}
+#stage.m .draft.hascont .dgroups{overflow:visible}#stage.m .draft.hascont .dgrp .drow{grid-auto-rows:150px}
+#stage.m .ph.big{font-size:30px;flex-direction:column;gap:2px}#stage.m .ph.big span{font-size:13px}
+#stage.m .czoom.boxzoom{position:fixed;left:0;right:0;width:auto;transform:none;top:calc(var(--sat) + 60px);bottom:calc(var(--sab) + 10px);flex-direction:column;overflow-y:auto;padding:16px;gap:10px}
+#stage.m .boxzoom .bzart{width:100%;height:auto}#stage.m .mbox.big{width:calc(466px * .66);height:calc(326px * .66)}#stage.m .mbox.big .cfb{--k:.66}
+#stage.m .boxzoom h3{font-size:32px}#stage.m .boxzoom .bzspec{font-size:16px}#stage.m .boxzoom .bzrow{font-size:15px}
+/* the roll on phones: Graceful Dice and the die above, the wheel below */
+#stage.m .rollstage{min-height:600px;flex-direction:column}
+#stage.m .gdice{left:16px;top:70px;margin:0;width:110px;height:110px}
+#stage.m .die{left:46px;top:150px;width:76px;height:76px;margin:0;border-radius:14px}#stage.m .die-face{inset:10px}#stage.m .die-face i{width:12px;height:12px}
+@keyframes dieThrowM{0%{transform:translate(0,-60px) rotate(0)}30%{transform:translate(120px,20px) rotate(260deg)}50%{transform:translate(170px,-30px) rotate(420deg)}70%{transform:translate(200px,20px) rotate(600deg)}100%{transform:translate(215px,20px) rotate(720deg)}}
+#stage.m .die.throw{animation-name:dieThrowM}
+#stage.m .rollmsg{top:10px;font-size:20px}#stage.m .rollmsg b{width:40px;height:40px;font-size:28px}#stage.m .rollmsg.big span{font-size:24px}
+#stage.m .wheelwrap{right:auto;left:50%;top:auto;bottom:10px;margin:0 0 0 -160px;width:320px;height:320px}
+#stage.m .wheel span em{font-size:12px;width:110px;margin-top:50px;top:16px}
+#stage.m .wheel span em{top:12px;width:auto;margin:0;max-height:105px;font-size:12px}
+/* the roll on phones (PWA): Graceful Dice and the bubble on top, the arena, then the wheel */
+#stage.m .rollstage,#stage.m .rollstage.wheeling{display:flex;flex-direction:column;min-height:0;gap:12px;padding-top:56px}
+#stage.m .gdwrap{flex-direction:row;gap:12px;align-self:stretch}
+#stage.m .gdwrap .gdice{width:84px;height:84px}
+#stage.m .gdsay{font-size:16px;max-width:none;flex:1}#stage.m .gdsay::before{left:-10px;top:50%;margin:-10px 0 0;border:10px solid transparent;border-left:0;border-right-color:#fff}
+#stage.m .arena{height:230px;align-self:stretch}
+#stage.m .rollstage.wheeling .arena{height:150px}
+#stage.m .die3d{width:76px;height:76px;--h:38px;left:20px;bottom:40px}#stage.m .dshadow{width:76px;left:20px;bottom:26px}
+#stage.m .cube .cf{border-radius:12px}#stage.m .cube .die-face{inset:9px}#stage.m .cube .die-face i{width:12px;height:12px}
+#stage.m .rollmsg{top:0;font-size:22px}#stage.m .rollmsg b{width:42px;height:42px;font-size:30px}#stage.m .rollmsg.big span{font-size:28px}
+#stage.m .wheelwrap{width:300px;height:300px;--wr:150px;margin:20px auto 30px}
+#stage.m .wheelwrap .wheel span em{font-size:12px;max-height:100px;top:12px}
+#stage.m .wflap{top:-22px;width:28px;height:40px;margin-left:-14px}
+#stage.m .rollrow{position:sticky;bottom:calc(var(--sab) + 10px);z-index:8}#stage.m .rollrow .gb{flex:1;justify-content:center}
+#stage.m .gdwrap .gdice{left:auto;top:auto;margin:0;position:relative}#stage.m .wheelwrap{position:relative;left:auto;right:auto;top:auto;bottom:auto;margin:24px auto 30px;align-self:center}
