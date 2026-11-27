@@ -1467,6 +1467,7 @@ html.reduce .cfp::after,html.reduce .bx-front::after{animation:none;display:none
 @keyframes pileGlow{50%{box-shadow:0 0 0 6px rgba(255,122,48,.25),0 0 30px rgba(255,122,48,.95)}}
 @media (prefers-reduced-motion:reduce){.ct.act,.banb.act{animation:none}}
 .pilehint{color:var(--acc-hi);font-weight:700;margin-left:6px}
+.pilego{font:inherit;color:inherit;background:none;border:0;padding:0;text-decoration:underline;text-underline-offset:3px;cursor:pointer;pointer-events:auto}
 .dl.can .card{outline:3px solid var(--acc);outline-offset:2px;box-shadow:0 0 20px rgba(255,122,48,.6)}
 .dl.can{color:var(--ink)}
 .dlacts{display:flex;flex-direction:column;gap:6px;margin-top:8px}
@@ -1530,3 +1531,13 @@ html.reduce .cfp::after,html.reduce .bx-front::after{animation:none;display:none
 .bpkeys kbd{display:inline-block;min-width:34px;padding:3px 8px;margin-right:8px;background:#2a211b;border:1px solid rgba(255,255,255,.18);font:800 16px 'Barlow Condensed';color:#fff;text-align:center}
 .bpkeys .r{margin-left:auto}
 #stage.touch .bpkeys{display:none}
+/* menu backgrounds (Zack, 2026-11-27: ink and wash, "shop counter, binder a, and the rest for the other screens"): one scene per
+   screen, assets/menu/<name>.jpg (web) and -m.jpg (phones), made with tools/style_treat.py from drafts in mockups/menu-scenes/drafts.
+   Each loads only when its screen first shows (screens are display:none until then).    On hold (Zack, 2026-11-27: "doesnt really feel like it fits with the rest of the games ui... we can revisit this later"): only with ?menuart (#stage.menuart). */
+#stage.menuart #s-title .menubg{background:url(../assets/menu/shop-counter.jpg) center/cover;filter:none;transform:none}
+#stage.menuart #s-settings .menubg{background:url(../assets/menu/back-room.jpg) center/cover;filter:none;transform:none}
+#stage.menuart #s-random .menubg,#stage.menuart #s-sealed .menubg,#stage.menuart #s-draft .menubg{background:url(../assets/menu/pack-desk.jpg) center/cover;filter:none;transform:none}
+#stage.menuart #s-mode .menubg{background:url(../assets/menu/locals-night.jpg) center/cover;filter:none;transform:none}
+#stage.menuart #s-format .menubg,#stage.menuart #s-deck .menubg,#stage.menuart #s-load .menubg{background:url(../assets/menu/regional-hall.jpg) center/cover;filter:none;transform:none}
+#stage.menuart #s-build .menubg{background:url(../assets/menu/binder.jpg) center/cover;filter:none;transform:none}
+#stage.menuart #s-stats .menubg,#stage.menuart #s-results .menubg{background:url(../assets/menu/trophy-shelf.jpg) center/cover;filter:none;transform:none}

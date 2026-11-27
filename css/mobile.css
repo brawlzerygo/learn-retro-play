@@ -366,7 +366,7 @@ html.m,html.m body{background:#0b0c10;overflow:hidden;height:100%}
    ===================================================================================================== */
 #stage.ml{--sab:max(env(safe-area-inset-bottom,0px),6px);--sal:max(env(safe-area-inset-left,0px),10px);--sar:max(env(safe-area-inset-right,0px),10px)}
 #stage.ml #scene{background:url(../assets/scenes/shop.jpg) var(--gox,0px) var(--goy,0px)/var(--gw) var(--gh) no-repeat,url(../assets/scenes/shop.jpg) center/cover;background-color:#2b170c}
-#stage.ml .menubg{background-image:url(../assets/scenes/shop.jpg)}
+
 /* left column */
 #stage.ml .lp{width:176px;height:50px;padding:0 10px 0 8px;gap:8px}
 #stage.ml .lp.op{left:var(--sal);right:auto;top:8px}
@@ -875,6 +875,7 @@ html.m.hs #stage.m{position:absolute}
 #stage.m .wipx svg{width:14px;height:14px}
 #stage.m .dlacts .gb{font-size:13px;min-height:40px}
 #stage.m .pilehint{display:block;margin:2px 0 0}
+#stage.m .pilego{padding:6px 2px;margin:-6px 0}
 /* the desktop key-hint bar: on phones its hints are hidden, but the empty bar still sat across the bottom of every menu screen and
    swallowed taps (2026-11-26: TCC couldn't press "Pick Gladiator Beast Darius" when its long text pushed the button down into it).
    Taps now go through the bar; anything placed in it (the Deck Builder's buttons) still works. */
@@ -925,3 +926,11 @@ html.m.hs #stage.m{position:absolute}
 #stage.m .bpt .ck svg{width:13px;height:13px}
 #stage.m .bpt.on{outline-width:3px}
 #stage.m .bpuse{margin:16px 20px 0;height:60px;justify-content:center;font-size:26px;flex:none}
+/* menu backgrounds on phones: the upright crops (2026-11-27) */
+#stage.m.menuart #s-title .menubg{background-image:url(../assets/menu/shop-counter-m.jpg);filter:none;transform:none;background-position:center}
+#stage.m.menuart #s-settings .menubg{background-image:url(../assets/menu/back-room-m.jpg);filter:none;transform:none;background-position:center}
+#stage.m.menuart #s-random .menubg,#stage.m.menuart #s-sealed .menubg,#stage.m.menuart #s-draft .menubg{background-image:url(../assets/menu/pack-desk-m.jpg);filter:none;transform:none;background-position:center}
+#stage.m.menuart #s-mode .menubg{background-image:url(../assets/menu/locals-night-m.jpg);filter:none;transform:none;background-position:center}
+#stage.m.menuart #s-format .menubg,#stage.m.menuart #s-deck .menubg,#stage.m.menuart #s-load .menubg{background-image:url(../assets/menu/regional-hall-m.jpg);filter:none;transform:none;background-position:center}
+#stage.m.menuart #s-build .menubg{background-image:url(../assets/menu/binder-m.jpg);filter:none;transform:none;background-position:center}
+#stage.m.menuart #s-stats .menubg,#stage.m.menuart #s-results .menubg{background-image:url(../assets/menu/trophy-shelf-m.jpg);filter:none;transform:none;background-position:center}
