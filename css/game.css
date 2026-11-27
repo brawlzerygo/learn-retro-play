@@ -136,6 +136,7 @@ html,body{height:100%;background:#0a0706;overflow:hidden;font-family:'Atkinson H
 
 /* ===== the duel ===== */
 #scene{position:absolute;inset:0;background:url(../assets/scenes/shop.jpg) center/cover}
+#stage #scene.mat,#stage.m #scene.mat,#stage.ml #scene.mat{background:#05060a}   /* a board (boards.js) draws its own world in 3D */
 #gl{position:absolute;inset:0;width:1920px;height:1080px}
 #ov{position:absolute;inset:0;pointer-events:none}
 .st{position:absolute;translate:-50% -25%;white-space:nowrap;font:700 18px Verdana;background:rgba(10,7,5,.9);padding:4px 11px;border-radius:4px;border:1px solid rgba(217,164,95,.5);box-shadow:0 4px 10px rgba(0,0,0,.6);transition:color .3s}
@@ -1470,3 +1471,28 @@ html.reduce .cfp::after,html.reduce .bx-front::after{animation:none;display:none
 .dl.can{color:var(--ink)}
 .dlacts{display:flex;flex-direction:column;gap:6px;margin-top:8px}
 .dlacts .gb{font-size:14px;padding:6px 8px;white-space:normal;line-height:1.15}
+
+/* the board preview in Settings (boards.js; Zack, 2026-11-26) */
+.vrow .bthumb{position:relative;width:128px;height:72px;margin-right:26px;flex:none;background:#000 center/cover;outline:2px solid rgba(255,255,255,.25);transition:outline-color .15s,transform .15s;transform:skewX(-6deg)}
+.vrow .bthumb b{position:absolute;left:0;right:0;bottom:0;padding:2px 0;background:rgba(0,0,0,.72);font:800 15px 'Barlow Condensed';font-style:italic;letter-spacing:.06em;text-align:center;color:#fff}
+.vrow .bthumb:hover{outline-color:var(--acc);transform:skewX(-6deg) scale(1.05)}
+.bigprev{position:absolute;inset:0;z-index:400;display:flex;align-items:center;justify-content:center;background:rgba(4,5,8,.86);animation:bpin .2s ease-out;cursor:pointer}
+.bigprev.out{opacity:0;transition:opacity .16s}
+.bigprev .bpbox{display:flex;flex-direction:column;gap:14px;animation:bpup .24s cubic-bezier(.2,.8,.2,1)}
+.bigprev img{display:block;width:1440px;height:810px;object-fit:cover;outline:3px solid rgba(255,255,255,.2);box-shadow:0 30px 80px rgba(0,0,0,.8)}
+.bigprev .bpcap{display:flex;justify-content:space-between;align-items:baseline;color:rgba(255,255,255,.7);font:600 22px 'Atkinson Hyperlegible'}
+.bigprev .bpcap .disp{font-size:44px;color:#fff}
+@keyframes bpin{from{opacity:0}}
+@keyframes bpup{from{opacity:0;transform:translateY(18px) scale(.98)}}
+/* version and release notes, bottom right of the home screen (Zack, 2026-11-26) */
+.verbar{position:absolute;right:60px;bottom:84px;z-index:4;display:flex;align-items:center;gap:16px;font:700 24px 'Barlow Condensed';letter-spacing:.06em;color:var(--mute)}
+.vnotes{border:0;background:none;padding:6px 0;font:800 24px 'Barlow Condensed';font-style:italic;letter-spacing:.06em;text-transform:uppercase;color:var(--acc);cursor:pointer}
+.vnotes:hover{color:var(--acc-hi);text-decoration:underline;text-underline-offset:4px}
+.relnotes{width:860px;inset:0;margin:auto;height:max-content;max-height:960px;translate:none}
+.rnlist{max-height:620px;overflow:auto;padding-right:8px;font:400 18px/1.5 'Atkinson Hyperlegible',sans-serif;color:#dfe3e8}
+.rnlist section+section{margin-top:22px;padding-top:18px;border-top:1px solid rgba(255,255,255,.1)}
+.rnhead{display:flex;align-items:baseline;gap:14px;margin-bottom:8px}
+.rnhead b{font:800 26px 'Barlow Condensed';font-style:italic;color:var(--acc)}
+.rnhead span{color:var(--mute);font-size:16px}
+.rnhead i{font-style:normal;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;background:rgba(255,255,255,.1);padding:2px 8px;border-radius:999px}
+.rnlist ul{margin:0;padding-left:22px}.rnlist li+li{margin-top:6px}

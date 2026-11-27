@@ -1,9 +1,11 @@
 /* Learn Retro Play: the game. Screens, the deck picker, and the duel: engine events (from js/worker.js) become animations on
  the 3D table (js/table.js) and the HUD; your choices go back to the engine. The engine decides every rule; this file only
  shows the duel and passes on what you pick. */
-import { Table } from './table.js?v=160';
-import * as S from './sfx.js?v=160';
-import * as FX from './fx.js?v=160';
+import { Table } from './table.js?v=167';
+import * as S from './sfx.js?v=167';
+import * as FX from './fx.js?v=167';
+import { Board, layoutOf, matChoice } from './boards.js?v=167';
+import { NOTES, verLabel } from './notes.js?v=167';
 
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -108,8 +110,9 @@ const SETROWS = [
   { k: 'hintLimit', name: 'Hints per duel', vals: ['off', '1', '3', '5', 'unlimited'], lab: v => v, desc: 'A hint shows the strongest play and why it beats the next best, like the hint button on a chess site.' },
   { k: 'vol', name: 'Sound effects', vals: [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100], blocks: true, desc: 'How loud cards, summons and battles are.' },
   { k: 'muted', name: 'Sound', vals: [false, true], lab: v => v ? 'off' : 'on', desc: 'Turn every sound on or off.' },
-  { k: 'table', name: 'Table', vals: ['shop'], lab: () => 'Card Shop', desc: 'The world your duels are played in.' },
+  { k: 'table', name: 'Table', vals: ['rewind', 'rune', 'dragon', 'caster', 'fiend', 'light', 'dark'], lab: v => ({ rewind: 'Rewind', rune: 'Runestone', dragon: 'Dragon', caster: 'Spellcaster', fiend: 'Fiend', light: 'Light', dark: 'Dark' })[v] || 'Rewind', desc: 'The world your duels are played in. Every board reacts to each play.' },   // boards.js (Zack, 2026-11-26: picked Rewind and Runestone, then the themed boards but Toon; Card Shop retired, Rewind the default)
 ];
+if (!SETROWS.find(r => r.k === 'table').vals.includes(SET.table)) SET.table = 'rewind';   // Card Shop retired (2026-11-26): its players move to Rewind
 let setRow = 0;
 // themes share one layout; a class on the stage swaps the look (css/rewind.css)
 // Rewind is in the back pocket (Zack, 2026-11-24): Broadcast always; set REWIND_PICKER true to bring back the Settings row and the T key
@@ -120,17 +123,28 @@ applyTheme();
 function renderSettings() {
   $('#setList').innerHTML = SETROWS.map((r, i) => { const v = SET[r.k] != null ? SET[r.k] : r.vals[0];
     const val = r.blocks ? `<span class="blocks">${r.vals.slice(1).map(x => `<i class="${x <= v ? 'f' : ''}"></i>`).join('')}</span><span class="vn">${v}</span>` : `<span class="vt">${r.lab(v)}</span>`;
-    return `<div class="vrow ${i === setRow ? 'on' : ''}" data-i="${i}"><span>${r.name}</span><span class="dots"></span><span class="val"><span class="arr" data-d="-1"><svg><use href="#i-tl"/></svg></span>${val}<span class="arr" data-d="1"><svg><use href="#i-tr"/></svg></span>${r.soon ? `<span class="soonv">${r.soon}</span>` : ''}</span></div>`; }).join('');
-  $('#setDesc').textContent = SETROWS[setRow].desc;
+    return `<div class="vrow ${i === setRow ? 'on' : ''}" data-i="${i}"><span>${r.name}</span><span class="dots"></span>${r.k === 'table' ? `<span class="bthumb" data-prev="1" title="Preview" style="background-image:url(${prevImg(v)})"><b>Preview</b></span>` : ''}<span class="val"><span class="arr" data-d="-1"><svg><use href="#i-tl"/></svg></span>${val}<span class="arr" data-d="1"><svg><use href="#i-tr"/></svg></span>${r.soon ? `<span class="soonv">${r.soon}</span>` : ''}</span></div>`; }).join('');
+  $('#setDesc').textContent = SETROWS[setRow].desc + (SETROWS[setRow].k === 'table' ? ` ${TAP()[0].toUpperCase() + TAP().slice(1)} the picture to see it full size.` : '');
+}
+// the board preview (Zack, 2026-11-26: "a preview option in the settings so players can see a preview of the board"): a still of each table,
+// the phone one on phones (assets/scenes/prev-<id>[-m].jpg, frames from tools/record.mjs duel clips)
+const prevImg = v => `assets/scenes/prev-${v || 'rewind'}${MOBILE ? '-m' : ''}.jpg`;
+function boardPreview() {
+  const r = SETROWS.find(x => x.k === 'table'), v = matChoice(SET.table); if ($('#bigprev')) return;
+  const d = document.createElement('div'); d.id = 'bigprev'; d.className = 'bigprev';
+  d.innerHTML = `<div class="bpbox"><img src="${prevImg(v)}" alt=""><div class="bpcap"><span class="disp">${r.lab(v)}</span><span>${TAP()[0].toUpperCase() + TAP().slice(1)} anywhere to close</span></div></div>`;
+  const close = () => { d.classList.add('out'); document.removeEventListener('keydown', key, true); setTimeout(() => d.remove(), 170); };
+  const key = e => { if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); close(); } };
+  d.onclick = close; document.addEventListener('keydown', key, true); stage.appendChild(d); S.play('select');
 }
 function changeSetting(i, d) {
   const r = SETROWS[i]; const cur = SET[r.k] != null ? SET[r.k] : r.vals[0]; let j = r.vals.indexOf(cur); if (j < 0) j = 0;
   const nj = Math.max(0, Math.min(r.vals.length - 1, j + d)); if (nj === j) { S.play('error'); return; }
   SET[r.k] = r.vals[nj]; saveSet();
-  if (r.k === 'vol') S.setVolume(SET.vol / 100); if (r.k === 'muted') S.setMuted(SET.muted); if (r.k === 'speed' && table) table.speed = SPEED[SET.speed]; if (r.k === 'theme') applyTheme();
+  if (r.k === 'vol') S.setVolume(SET.vol / 100); if (r.k === 'muted') S.setMuted(SET.muted); if (r.k === 'speed' && table) table.speed = SPEED[SET.speed]; if (r.k === 'theme') applyTheme(); if (r.k === 'table' && table) rebuildTable();
   S.play('click'); renderSettings();
 }
-$('#setList').onclick = e => { const row = e.target.closest('[data-i]'); if (!row) return; setRow = +row.dataset.i; const a = e.target.closest('[data-d]'); if (a) changeSetting(setRow, +a.dataset.d); else { S.play('hover'); renderSettings(); } };
+$('#setList').onclick = e => { const row = e.target.closest('[data-i]'); if (!row) return; setRow = +row.dataset.i; if (e.target.closest('[data-prev]')) { renderSettings(); boardPreview(); return; } const a = e.target.closest('[data-d]'); if (a) changeSetting(setRow, +a.dataset.d); else { S.play('hover'); renderSettings(); } };
 renderSettings();
 
 /* ---------- data ---------- */
@@ -144,7 +158,7 @@ const tileBg = id => TILE_ART.has(+id) ? `<div class="art" style="background-ima
 const artUrl = id => id == null ? 'img/back.webp' : typeof id === 'string' && TOKEN_ART[id] ? `img/${TOKEN_ART[id][0]}.webp` : `img/${id}.webp`;
 
 /* ---------- the duel host ---------- */
-const W = new Worker('js/worker.js?v=160');
+const W = new Worker('js/worker.js?v=167');
 let READY = null; const readyP = new Promise(r => { W.addEventListener('message', function h(e) { if (e.data.type === 'ready') { READY = e.data.formats; W.removeEventListener('message', h); r(); } }); });
 W.postMessage({ type: 'init' });
 W.onmessage = e => { const m = e.data; if (m.type === 'update') duelUpdate(m); else if (m.type === 'hint') showHint(m); else if (m.type === 'summary') { if (D) { D.summary = m.summary; if (D.over) { recordMatch(D.over, m.summary); renderReview(m.summary); } } } else if (m.type === 'reviewing') { const el = $('#resReview p.mute'); if (el) el.textContent = `Reviewing your duel… ${m.left} decisions left`; } else if (m.type === 'error') { console.error(m.message, m.stack); toast('Something went wrong in the engine: ' + m.message, 6000); } };
@@ -728,7 +742,11 @@ async function ensureTable() {
 async function makeTable() {
   const key = MOBILE && !LAND ? 'shop-m' : 'shop';
   camData = CAMS[key] || (CAMS[key] = await (await fetch(`assets/scenes/${key}-camera.json`)).json());
-  table = new Table($('#gl'), camData, { tokenArt: TOKEN_ART, phone: MOBILE, view: MOBILE ? mview() : undefined });
+  // the duel board (boards.js): none is today's Card Shop scene
+  const MAT = matChoice(SET.table);
+  table = new Table($('#gl'), camData, { tokenArt: TOKEN_ART, phone: MOBILE, view: MOBILE ? mview() : undefined, layout: MAT ? layoutOf(MAT) : null });
+  $('#scene').classList.toggle('mat', !!MAT);
+  if (MAT) new Board(table, MAT, { phone: MOBILE, rec: id => rec(D ? D.fmt : SEL.fmt, id) });
   table.speed = SPEED[SET.speed];
   table.bindPointer($('#gl'), toStage);
   table.onHover = h => { $('#gl').classList.toggle('point', !!(h && (h.u != null || h.pile || h.zone))); if (!D) return; if (h && h.u != null) inspectU(h.u); else if (h && h.pile) hoverPile(h.pile); };
@@ -770,7 +788,7 @@ async function startDuel() {
   D = { fmt: f, you: youDeck.name, cpu: cpuDeck.name, youDeck, cpuDeck, first, q: [], busy: false, prompt: null, view: null, disp: null, lp: [8000, 8000], turn: 0, phase: '', tp: first,
     chain: [], log: [], stats: { summons: 0, synchro: 0, destroyed: 0, biggest: 0, dealt: 0, chains: 0, mvp: new Map(), lastAtk: null }, over: null, sel: null, zoneMode: null, picks: null };
   table.clearField(new Set()); for (const side of [1, -1]) for (const k of ['deck', 'extra', 'gy', 'ban']) table.setPile(side, k, 0, null);
-  table.setPile(1, 'deck', youDeck.main.length, null); table.setPile(-1, 'deck', cpuDeck.main.length, null);
+  table.setPile(1, 'deck', youDeck.main.length, null); table.setPile(-1, 'deck', cpuDeck.main.length, null); if (table.board) table.board.reset();
   table.setPile(1, 'extra', youDeck.extra.length, null); table.setPile(-1, 'extra', cpuDeck.extra.length, null);
   $('#hand').innerHTML = ''; $('#ohand').innerHTML = ''; $('#ov').innerHTML = ''; $('#layer').innerHTML = ''; $('#chainp').classList.add('hidden'); $('#inspect').classList.add('hidden');
   D.disp = { p: [{ hand: [], deck: youDeck.main.length }, { hand: [], deck: cpuDeck.main.length }] };
@@ -816,13 +834,13 @@ const waitMs = ms => sleep(ms * GAP[SET.speed]);
 
 async function anim(ev) {
   // a new turn or phase gets its banner first
-  if (ev.turn != null && ev.turn !== D.turn && ev.turn > 0) { D.turn = ev.turn; D.tp = ev.turn % 2 === 1 ? D.first : 1 - D.first; $('#turnNo').textContent = ev.turn; await turnBanner(); }
-  if (ev.phase && ev.phase !== D.phase) { D.phase = ev.phase; setPhase(ev.phase); if (ev.phase === 'battle') await banner('Battle Phase', D.tp === 0 ? '' : 'The computer is attacking', D.tp !== 0); }
+  if (ev.turn != null && ev.turn !== D.turn && ev.turn > 0) { D.turn = ev.turn; D.tp = ev.turn % 2 === 1 ? D.first : 1 - D.first; $('#turnNo').textContent = ev.turn; if (table.board) table.board.turn(side(D.tp)); await turnBanner(); }
+  if (ev.phase && ev.phase !== D.phase) { D.phase = ev.phase; setPhase(ev.phase); if (table.board) table.board.phase(ev.phase, side(D.tp)); if (ev.phase === 'battle') await banner('Battle Phase', D.tp === 0 ? '' : 'The computer is attacking', D.tp !== 0); }
   const t = ev.type;
   if (t === 'move') return animMove(ev);
   if (t === 'summon') {
     for (const u of ev.us) { const p = table.where(u); if (!p) continue; const big = ['synchro', 'fusion', 'ritual'].includes(ev.how);
-      table.burst(p, big ? 0xffd080 : 0xff9a50, big ? 1.5 : 1); if (big) table.pillar(p); S.play(big ? 'synchro' : 'summon'); }
+      if (table.board) table.board.summon(p, (table.cards.get(u) || {}).id, big); else { table.burst(p, big ? 0xffd080 : 0xff9a50, big ? 1.5 : 1); if (big) table.pillar(p); } S.play(big ? 'synchro' : 'summon'); }
     D.stats.summons += ev.p === 0 ? 1 : 0; if (ev.p === 0 && ev.how === 'synchro') D.stats.synchro++;
     if (FX.on()) { for (const u of ev.us) await FX.summon(u, (table.cards.get(u) || {}).id, ev.how, ev.p); return; }
     return waitMs(ev.how === 'synchro' || ev.how === 'fusion' ? 520 : 260);
@@ -836,11 +854,12 @@ async function anim(ev) {
     D.stats.lastAtk = ev.a; S.play('attack');
     const to = ev.t != null && table.where(ev.t) ? table.where(ev.t) : table.screenToWorld(960, ev.p === 0 ? 90 : 1000, 0.3);
     if (ev.t != null) table.ringOn(ev.t, ev.p === 0 ? 0xff7a30 : 0x7fb8ff);
+    if (table.board) table.board.attack(table.where(ev.a), ev.t != null ? table.where(ev.t) : null, side(ev.p));
     if (FX.on()) { await FX.attackStart(ev.a, ev.t, ev.p); setTimeout(() => FX.attackHit(ev.a, ev.t, ev.p, ev.t == null), (240 + 170) * (table.speed || 1)); }
     await table.lunge(ev.a, to); table.ringsOff(); FX.attackEnd(); return;
   }
   if (t === 'damage') {
-    const before = D.lp[ev.p]; setLP(ev.p, ev.lp); S.play('hit'); const pl = ev.p === 0 ? $('#lpMe') : $('#lpOp');
+    const before = D.lp[ev.p]; setLP(ev.p, ev.lp); if (table.board) table.board.damage(side(ev.p), ev.n, ev.lp); S.play('hit'); const pl = ev.p === 0 ? $('#lpMe') : $('#lpOp');
     pl.classList.remove('shake'); void pl.offsetWidth; pl.classList.add('shake');
     popNum(ev.p, '-' + ev.n); FX.damage(ev.p, ev.n, pl);
     if (ev.p === 1) { D.stats.dealt += ev.n; D.stats.biggest = Math.max(D.stats.biggest, ev.n); if (ev.battle && D.stats.lastAtk != null) D.stats.mvp.set(D.stats.lastAtk, (D.stats.mvp.get(D.stats.lastAtk) || 0) + ev.n); }
@@ -850,8 +869,9 @@ async function anim(ev) {
   if (t === 'chain') {
     if (ev.p === 0) D.stats.chains++;
     D.chain.push(ev); renderChain(); S.play(ev.link > 1 ? 'chain' : 'activate'); FX.activate(ev.u, ev.id, ev.p, ev.link);
-    const c = table.cards.get(ev.u); if (c && !c.up) await table.flip(ev.u, ev.id, true);
-    else if (c) table.burst(c.g.position, 0xffc070, 0.7);
+    const c = table.cards.get(ev.u); if (c && table.board) table.board.activate(c.g.position, ev.id);
+    if (c && !c.up) await table.flip(ev.u, ev.id, true);
+    else if (c && !table.board) table.burst(c.g.position, 0xffc070, 0.7);
     for (const tu of ev.targets || []) table.ringOn(tu, ev.p === 0 ? 0xff7a30 : 0x7fb8ff);
     if (ev.link >= 2) await banner(`Chain Link ${ev.link}`, ev.name, ev.p !== 0); else await waitMs(650);
     return;
@@ -930,7 +950,7 @@ async function animMove(ev) {
   }
   else if (ev.from === 'hand') { from = handPoint(p, ev.u); dropHand(p, ev.u); }
   else if (pileKind(ev.from)) { from = table.pileTop(fromSide, pileKind(ev.from)); bumpPile(fromSide, pileKind(ev.from), -1, ev.u); }
-  if (ev.destroyed && table.has(ev.u)) { S.play('destroy'); if (await FX.shatter(ev.u)) from = null; else await table.shatter(ev.u); if (ev.owner === 1) D.stats.destroyed++; }   // FX: the pieces fall; the card appears in the pile
+  if (ev.destroyed && table.has(ev.u)) { S.play('destroy'); if (table.board) table.board.destroy(table.where(ev.u)); if (await FX.shatter(ev.u)) from = null; else await table.shatter(ev.u); if (ev.owner === 1) D.stats.destroyed++; }   // FX: the pieces fall; the card appears in the pile
   // where it goes
   if (['m', 'st', 'fz'].includes(ev.to)) {
     const up = ev.pos !== 'set';
@@ -1016,7 +1036,7 @@ function renderHands(newU) {
     let d = old.get(c.u); if (!d) { d = document.createElement('div'); d.className = 'hc in'; d.dataset.u = c.u; el.appendChild(d); }
     old.delete(c.u);
     d.style.backgroundImage = `url(${artUrl(c.id)})`; d.style.left = (x0 + i * step) + 'px';
-    const rot = (i - (n - 1) / 2) * Math.min(MOBILE ? 3 : 4, 24 / n); d.style.transform = `rotate(${rot}deg)`; d.style.zIndex = i + 1;
+    d.style.transform = 'rotate(0deg)'; d.style.zIndex = i + 1;   // level, no fan (Zack, 2026-11-26: the hand was "a bit too staggered")
   });
   for (const d of old.values()) { d.classList.add('gone'); d.removeAttribute('data-u'); setTimeout(() => d.remove(), 240); }
   $('#hcMe').textContent = n;
@@ -1024,7 +1044,7 @@ function renderHands(newU) {
   const os = MOBILE ? Math.min(30, 230 / Math.max(1, on)) : Math.min(92, 520 / Math.max(1, on)), ox = MOBILE ? (LAND ? LG.cx : SW / 2) - (os * (on - 1)) / 2 - 20 : 300 - (os * (on - 1)) / 2 - 48;
   while (oe.children.length > on) oe.lastElementChild.remove();
   while (oe.children.length < on) { const c = document.createElement('div'); c.className = 'card in'; oe.appendChild(c); }
-  [...oe.children].forEach((c, i) => { c.style.left = (ox + i * os) + 'px'; c.style.transform = `rotate(${(i - (on - 1) / 2) * -3}deg) translateZ(0)`; });
+  [...oe.children].forEach((c, i) => { c.style.left = (ox + i * os) + 'px'; c.style.transform = 'rotate(0deg) translateZ(0)'; });
   $('#hcOp').textContent = on;
 }
 $('#hand').addEventListener('mouseover', e => { const c = e.target.closest('.hc'); if (c) { const h = D && D.disp.p[0].hand.find(x => x.u === +c.dataset.u); if (h) inspect(h.id); } });
@@ -2222,6 +2242,18 @@ async function checkUpdate() {
   } catch (e) { /* offline */ }
 }
 if (!/localhost|127\.0\.0\.1/.test(location.hostname)) { setTimeout(checkUpdate, 1500); document.addEventListener('visibilitychange', () => { if (!document.hidden) checkUpdate(); }); }
+
+// version and release notes in the home screen's corner (Zack, 2026-11-26: "change our version logic to a decimal - so this one being 1.67";
+// "a 'latest release notes' page thats clickable in the bottom right next to the version"). ?v= stays a whole number (the cache key
+// and the update check); players see it as v1.67. Notes live in js/notes.js, newest first.
+function releaseNotes() {
+  S.play('click'); const v = document.createElement('div'); v.className = 'veil'; v.style.zIndex = 69; const p = document.createElement('div'); p.className = 'pn dlg relnotes'; p.style.zIndex = 70;
+  p.innerHTML = `<h3 class="disp">What's new</h3><div class="rnlist">${NOTES.map(n => `<section><div class="rnhead"><b>${verLabel(n.v)}</b><span>${esc(n.date)}</span>${n.v === MYV ? '<i>You have this</i>' : ''}</div><ul>${n.items.map(x => `<li>${esc(x)}</li>`).join('')}</ul></section>`).join('')}</div><div class="btns"><button class="gb pri" data-y>Close<span class="shine"></span></button></div>`;
+  stage.append(v, p); const key = e => { if (e.key === 'Escape' || e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); done(); } };
+  const done = () => { v.remove(); p.remove(); document.removeEventListener('keydown', key, true); };
+  document.addEventListener('keydown', key, true); v.onclick = done; p.onclick = e => { if (e.target.closest('[data-y]')) done(); };
+}
+$('#verNum').textContent = verLabel(MYV || NOTES[0].v); $('#verNotes').onclick = releaseNotes;
 
 // work-in-progress note on the title screen; hidden for good once closed
 { const w = $('#wipNote'); if (w && localStorage.getItem('lrplay:wip') !== '1') { w.hidden = false; $('#wipX').onclick = () => { w.hidden = true; localStorage.setItem('lrplay:wip', '1'); }; } }

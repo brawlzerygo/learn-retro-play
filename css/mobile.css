@@ -875,3 +875,25 @@ html.m.hs #stage.m{position:absolute}
 #stage.m .wipx svg{width:14px;height:14px}
 #stage.m .dlacts .gb{font-size:13px;min-height:40px}
 #stage.m .pilehint{display:block;margin:2px 0 0}
+/* the desktop key-hint bar: on phones its hints are hidden, but the empty bar still sat across the bottom of every menu screen and
+   swallowed taps (2026-11-26: TCC couldn't press "Pick Gladiator Beast Darius" when its long text pushed the button down into it).
+   Taps now go through the bar; anything placed in it (the Deck Builder's buttons) still works. */
+#stage.m .keybar{pointer-events:none}
+#stage.m .keybar > *{pointer-events:auto}
+#stage.m .keybar > .kh,#stage.m .keybar > .sp{pointer-events:none}
+
+/* the board preview in Settings, phones: a small picture in the Table row, the phone still when tapped, sized to the screen */
+#stage.m .vrow .bthumb{width:46px;height:46px;margin:0 6px 0 auto;transform:none;background-position:center 42%}
+#stage.m .vrow .bthumb b{display:none}
+#stage.m .vrow .bthumb + .val{margin-left:0}
+#stage.m .bigprev{align-items:flex-start;padding-top:calc(var(--sat, 0px) + 16px)}
+#stage.m .bigprev .bpbox{width:calc(100% - 32px);height:calc(100% - var(--sat, 0px) - var(--sab, 0px) - 32px);gap:8px}
+#stage.m .bigprev img{width:100%;height:0;flex:1;min-height:0;object-fit:contain}
+#stage.m .bigprev .bpcap{flex-direction:column;align-items:center;gap:2px;font-size:14px}
+#stage.m .bigprev .bpcap .disp{font-size:28px}
+/* version and release notes: in the home column under the save note (2026-11-26) */
+#stage.m #s-title .verbar{order:6;position:relative;right:auto;bottom:auto;justify-content:center;margin-top:4px;font-size:14px;gap:10px}
+#stage.m .vnotes{font-size:15px;padding:8px 4px;min-height:36px}
+#stage.m .relnotes{width:auto;max-height:none}
+#stage.m .rnlist{max-height:60vh;font-size:15px}
+#stage.m .rnhead b{font-size:22px}
