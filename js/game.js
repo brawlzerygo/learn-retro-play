@@ -1,12 +1,12 @@
 /* Learn Retro Play: the game. Screens, the deck picker, and the duel: engine events (from js/worker.js) become animations on
  the 3D table (js/table.js) and the HUD; your choices go back to the engine. The engine decides every rule; this file only
  shows the duel and passes on what you pick. */
-import { Table } from './table.js?v=180';
-import * as S from './sfx.js?v=180';
-import * as FX from './fx.js?v=180';
-import { Board, layoutOf, matChoice } from './boards.js?v=180';
-import { NOTES, verLabel } from './notes.js?v=180';
-import { paintMenuBg } from './menubg.js?v=180';
+import { Table } from './table.js?v=184';
+import * as S from './sfx.js?v=184';
+import * as FX from './fx.js?v=184';
+import { Board, layoutOf, matChoice } from './boards.js?v=184';
+import { NOTES, verLabel } from './notes.js?v=184';
+import { paintMenuBg } from './menubg.js?v=184';
 
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -192,7 +192,7 @@ const tileBg = id => TILE_ART.has(+id) ? `<div class="art" style="background-ima
 const artUrl = id => id == null ? 'img/back.webp' : typeof id === 'string' && TOKEN_ART[id] ? `img/${TOKEN_ART[id][0]}.webp` : `img/${id}.webp`;
 
 /* ---------- the duel host ---------- */
-const W = new Worker('js/worker.js?v=180');
+const W = new Worker('js/worker.js?v=184');
 let READY = null; const readyP = new Promise(r => { W.addEventListener('message', function h(e) { if (e.data.type === 'ready') { READY = e.data.formats; W.removeEventListener('message', h); r(); } }); });
 W.postMessage({ type: 'init' });
 W.onmessage = e => { const m = e.data; if (m.type === 'update') duelUpdate(m); else if (m.type === 'hint') showHint(m); else if (m.type === 'summary') { if (D) { D.summary = m.summary; if (D.over) { recordMatch(D.over, m.summary); renderReview(m.summary); } } } else if (m.type === 'reviewing') { const el = $('#resReview p.mute'); if (el) el.textContent = `Reviewing your duel… ${m.left} decisions left`; } else if (m.type === 'error') { console.error(m.message, m.stack); toast('Something went wrong in the engine: ' + m.message, 6000); } };
@@ -200,7 +200,7 @@ W.onmessage = e => { const m = e.data; if (m.type === 'update') duelUpdate(m); e
 /* ---------- screens ---------- */
 let cur = 'title';
 const AUTO = new URLSearchParams(location.search).has('autoplay');   // testing only: your seat plays itself with the hint engine
-window.__lr = { get D() { return D; }, get SEL() { return SEL; }, start: () => startDuel(), show: x => show(x) };
+window.__lr = { get D() { return D; }, get SEL() { return SEL; }, start: () => startDuel(), show: x => show(x), get table() { return table; } };
 // one Back button, the same spot on every screen that has one (Zack, 2026-11-24)
 const BACK = { sealed: 'mode', random: 'mode', settings: 'title', mode: 'title', format: 'mode', deck: 'format', stats: 'title', build: 'title', draft: 'mode' };
 // inside Draft, Sealed and Random and Jank, Back goes one step back before leaving the mode (Zack, 2026-11-25: "it should take you to the prev screen")
@@ -221,7 +221,7 @@ async function leaveRun() { const k = liveRun(); if (!k) return true; if (!(awai
 async function goBack() { const k = liveRun(), left = await leaveRun(); if (!left) return; if (typeof left === 'string') { S.play('nav'); if (k === 'draft') { dMenu = true; if (DPOOLS[left].jank) backToJank(left); else if (DPOOLS[left].classic) renderThemePick(left); else { dPick = false; renderDraft(true); } } else { sMenu = true; renderPackPick(left); } return; } if (subBack()) { S.play('nav'); return; } if (cur === 'build' && B.dirty && !(await ask('Leave without saving?', 'Leave'))) return; if (BACK[cur]) show(BACK[cur]); }
 $('#gBack').onclick = () => { S.unlock(); goBack(); };
 $('#mTabs').onclick = async e => { const b = e.target.closest('[data-tab]'); if (!b || b.dataset.tab === cur) return; S.unlock(); if (!(await leaveRun())) return; if (cur === 'build' && B.dirty && !(await ask('Leave without saving?', 'Leave'))) return; show(b.dataset.tab); };
-function show(s) { if (s !== 'random' && typeof rollStop === 'function') rollStop(); const prevScr = cur; if (s !== cur) S.play('nav'); if (s !== cur) closeDeckList(); if (s !== 'build') closeCardZoom(); cur = s; stage.dataset.scr = s; $$('#mTabs [data-tab]').forEach(b => b.classList.toggle('on', b.dataset.tab === s)); closeSheet(); $('#gBack').classList.toggle('on', !!BACK[s]); $$('.screen').forEach(e => { const on = e.id === 's-' + s; if (!on && e.classList.contains('on') && !REDUCED) { e.classList.add('leaving'); setTimeout(() => e.classList.remove('leaving'), 260); } e.classList.toggle('on', on); }); if (s === 'deck') { if (prevScr !== 'deck') { PK = { you: false, cpu: false }; pickingOpp = false; SEL.mtab = 'you'; } renderDecks(); } if (s === 'format') renderFormats(); if (s === 'mode') renderModes(); if (s === 'random') { RND = { f: null }; renderRandom(true); } if (s === 'build') { if (!B.enterSealed && B.sealed) { B.sealed = null; B.deck = null; } BACK.build = B.sealed ? 'sealed' : 'title'; $('#gBack').classList.add('on'); B.enterSealed = false; B.howto = undefined; readyP.then(openBuilder); } if (s === 'sealed') { sMenu = !(prevScr === 'build' && B.sealed); if (sMenu && SD()) saveSD(null); renderSealed(true); } /* OK hides the how-to only until the next visit */ if (s === 'stats') renderStats(); if (s === 'draft') { dSel = null; dMenu = true; if (DR()) saveDR(null); renderDraft(true); } if (s === 'settings') renderSettings(); if (s === 'title') updateTicker(); const gbb = $('.gbackbar'); if (gbb) gbb.hidden = ['build', 'stats', 'settings', 'duel'].includes(s); }
+function show(s) { if (UPD_ON) setTimeout(updBanner, 0); if (s !== 'random' && typeof rollStop === 'function') rollStop(); const prevScr = cur; if (s !== cur) S.play('nav'); if (s !== cur) closeDeckList(); if (s !== 'build') closeCardZoom(); cur = s; stage.dataset.scr = s; $$('#mTabs [data-tab]').forEach(b => b.classList.toggle('on', b.dataset.tab === s)); closeSheet(); $('#gBack').classList.toggle('on', !!BACK[s]); $$('.screen').forEach(e => { const on = e.id === 's-' + s; if (!on && e.classList.contains('on') && !REDUCED) { e.classList.add('leaving'); setTimeout(() => e.classList.remove('leaving'), 260); } e.classList.toggle('on', on); }); if (s === 'deck') { if (prevScr !== 'deck') { PK = { you: false, cpu: false }; pickingOpp = false; SEL.mtab = 'you'; } renderDecks(); } if (s === 'format') renderFormats(); if (s === 'mode') renderModes(); if (s === 'random') { RND = { f: null }; renderRandom(true); } if (s === 'build') { if (!B.enterSealed && B.sealed) { B.sealed = null; B.deck = null; } BACK.build = B.sealed ? 'sealed' : 'title'; $('#gBack').classList.add('on'); B.enterSealed = false; B.howto = undefined; readyP.then(openBuilder); } if (s === 'sealed') { sMenu = !(prevScr === 'build' && B.sealed); if (sMenu && SD()) saveSD(null); renderSealed(true); } /* OK hides the how-to only until the next visit */ if (s === 'stats') renderStats(); if (s === 'draft') { dSel = null; dMenu = true; if (DR()) saveDR(null); renderDraft(true); } if (s === 'settings') renderSettings(); if (s === 'title') updateTicker(); const gbb = $('.gbackbar'); if (gbb) gbb.hidden = ['build', 'stats', 'settings', 'duel'].includes(s); }
 // browsers keep a page silent until the first click, tap or key press (hovering doesn't count): turn sound on at the very first one, anywhere
 for (const ev of ['pointerdown', 'keydown', 'touchstart']) addEventListener(ev, () => S.unlock(), { capture: true, passive: true });
 document.addEventListener('click', e => { const b = e.target.closest('[data-go]'); if (b) { S.unlock(); show(b.dataset.go); } const h = e.target.closest('[data-href]'); if (h) open(h.dataset.href, '_blank'); });
@@ -1223,7 +1223,10 @@ function promptRespond(pr) {
   const box = document.createElement('div'); box.className = 'pn amenu respond'; Object.assign(box.style, { right: '36px', bottom: '120px', position: 'absolute' });
   markPiles(by);   // a Graveyard effect (Necro Gardna) is in this list too, named, since its card isn't on the table
   const inPile = o => PILEKINDS.some(k => D.pileOps[k] && D.pileOps[k].has(o.u));
-  box.innerHTML = `<div class="ph">Respond</div>` + pr.opts.filter(o => o.key !== 'pass').map((o, i) => `<button class="gb sm wide" data-k="${esc(o.key)}"><svg><use href="#i-bolt"/></svg><span class="lbl">${inPile(o) ? esc(nameOfU(o.u)) + ': ' : ''}${esc(o.label)}</span><span class="key">${i + 1}</span><span class="shine"></span></button>`).join('')
+  // nothing on the chain yet on your own turn (right after your summon): you start something new, not a response (2026-11-27, a player read
+  // the old "Respond" box as Black Whirlwind being activated in a chain like a Quick-Play)
+  const fresh = mine && !(D.chain && D.chain.length);
+  box.innerHTML = `<div class="ph">${fresh ? 'Play now' : 'Respond'}</div>` + pr.opts.filter(o => o.key !== 'pass').map((o, i) => `<button class="gb sm wide" data-k="${esc(o.key)}"><svg><use href="#i-bolt"/></svg><span class="lbl">${inPile(o) ? esc(nameOfU(o.u)) + ': ' : ''}${esc(o.label)}</span><span class="key">${i + 1}</span><span class="shine"></span></button>`).join('')
     + `<button class="gb sm wide pri" data-k="pass"><svg><use href="#i-pass"/></svg>${mine ? 'Continue' : 'Pass'}<span class="key">Space</span><span class="shine"></span></button>`;
   box.onclick = e => { const b = e.target.closest('[data-k]'); if (b) send([b.dataset.k]); };
   box.onmouseover = e => { const b = e.target.closest('[data-k]'); const o = b && pr.opts.find(x => x.key === b.dataset.k); if (o && o.id != null) inspect(o.id); };
@@ -2283,22 +2286,39 @@ function rollFullyRandom(f) {
   $('#rSkip').onclick = finish;
 }
 
-// the home-screen app can keep an old copy of the game long after an update (Zack, 2026-11-26: a fix was live but his app still showed
-// the old screen), so on opening and on coming back to it, the game asks for index.html past every cache and reloads once if it is newer
+// Updates (Zack, 2026-11-27: "banner with button if they have it open, quiet reload if it's a new open"; no silent reloads while playing).
+// Opening the game (or the home-screen app) onto an old copy reloads it once, quietly, before anything starts. A game already open checks
+// every 3 minutes and on coming back to the tab; a newer version shows a "New version ready" banner with Restart on the menu screens only
+// (never in a duel, on results or in the Deck Builder). Nothing reloads unless the player taps Restart.
 const MYV = +(new URL(import.meta.url).searchParams.get('v') || 0);
-async function checkUpdate() {
+var UPD_SAFE = new Set(['title', 'mode', 'format', 'deck', 'stats', 'settings']);
+var UPD_ON = !/localhost|127\.0\.0\.1/.test(location.hostname) || new URLSearchParams(location.search).has('updtest');
+let UPD_NEW = 0, UPD_HIDE = 0;
+const updReload = nv => { const u = new URL(location.href); u.searchParams.set('r', nv); location.replace(u.href); };
+async function checkUpdate(first) {
   try {
     const t = await (await fetch('index.html?u=' + Date.now(), { cache: 'no-store' })).text();
-    const nv = +((t.match(/game\.js\?v=(\d+)/) || [])[1] || 0);
-    if (nv > MYV && cur !== 'duel' && sessionStorage.getItem('lrplay:upd') !== String(nv)) { sessionStorage.setItem('lrplay:upd', String(nv)); const u = new URL(location.href); u.searchParams.set('r', nv); location.replace(u.href); }
+    let nv = +((t.match(/game\.js\?v=(\d+)/) || [])[1] || 0); const fake = +(new URLSearchParams(location.search).get('updtest') || 0); if (fake) nv = Math.max(nv, fake);
+    if (nv <= MYV) return;
+    if (first === true && cur === 'title' && sessionStorage.getItem('lrplay:upd') !== String(nv)) { sessionStorage.setItem('lrplay:upd', String(nv)); updReload(nv); return; }
+    UPD_NEW = nv; updBanner();
   } catch (e) { /* offline */ }
 }
-if (!/localhost|127\.0\.0\.1/.test(location.hostname)) { setTimeout(checkUpdate, 1500); document.addEventListener('visibilitychange', () => { if (!document.hidden) checkUpdate(); }); }
+function updBanner() {
+  let el = $('#updBar'); const on = UPD_NEW && UPD_NEW !== UPD_HIDE && UPD_SAFE.has(cur);
+  if (!on) { if (el) el.remove(); return; }
+  if (el) return;
+  el = document.createElement('div'); el.id = 'updBar'; el.className = 'updbar';
+  el.innerHTML = `<b class="disp">New version ready</b><span>Restart to get the latest fixes.</span><button class="gb pri" data-r>Restart<span class="shine"></span></button><button class="updx" data-x aria-label="Not now">\u00d7</button>`;
+  el.onclick = e => { if (e.target.closest('[data-r]')) { S.play('click'); updReload(UPD_NEW); } else if (e.target.closest('[data-x]')) { S.play('click'); UPD_HIDE = UPD_NEW; el.remove(); } };
+  stage.append(el);
+}
+if (UPD_ON) { setTimeout(() => checkUpdate(true), 1500); setInterval(checkUpdate, 180000); document.addEventListener('visibilitychange', () => { if (!document.hidden) checkUpdate(); }); }
 
 // version and release notes in the home screen's corner (Zack, 2026-11-26: "change our version logic to a decimal - so this one being 1.67";
 // "a 'latest release notes' page thats clickable in the bottom right next to the version"). ?v= stays a whole number (the cache key
 // and the update check). Players see the newest entry in js/notes.js (Zack, 2026-11-26: small changes can "land in the whats new popup"
-// of the current version, so the cache number can move on while the version stays, e.g. ?v=180 still shows v1.68).
+// of the current version, so the cache number can move on while the version stays, e.g. ?v=184 still shows v1.68).
 function releaseNotes() {
   S.play('click'); const v = document.createElement('div'); v.className = 'veil'; v.style.zIndex = 69; const p = document.createElement('div'); p.className = 'pn dlg relnotes'; p.style.zIndex = 70;
   p.innerHTML = `<h3 class="disp">What's new</h3><div class="rnlist">${NOTES.map(n => `<section><div class="rnhead"><b>${verLabel(n.v)}</b><span>${esc(n.date)}</span>${n === NOTES[0] ? '<i>You have this</i>' : ''}</div><ul>${n.items.map(x => `<li>${esc(x)}</li>`).join('')}</ul></section>`).join('')}</div><div class="btns"><button class="gb pri" data-y>Close<span class="shine"></span></button></div>`;
